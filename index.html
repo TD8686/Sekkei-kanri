@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>設計進捗管理システム</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Caveat:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --bg:#f5f0e8; --surface:#fffdf8; --surface2:#ede8dc;
+  --border:#d4cbb8; --border2:#b8a98a;
+  --accent:#4a7fd4; --accent2:#2a9d8f;
+  --warn:#c97a0a; --danger:#c0392b; --success:#27ae60;
+  --muted:#9c8e7a; --text:#2c2416; --text2:#6b5e4a;
+  --shadow:0 1px 4px rgba(60,40,10,.10);
+  --week-bg:#e8e0d0; --week-border:#b8a98a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:12px}
+header{background:var(--surface);border-bottom:2px solid var(--border2);padding:0 18px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow)}
+.logo{display:flex;align-items:center;gap:9px;font-weight:900;font-size:15px;color:var(--text)}
+.logo-icon{width:28px;height:28px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff}
+.date-badge{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);background:var(--surface2);padding:4px 10px;border-radius:4px;border:1px solid var(--border)}
+.summary-bar{display:flex;gap:10px;padding:14px 18px;overflow-x:auto;position:sticky;top:0;z-index:99;background:var(--bg);border-bottom:1px solid var(--border);}
+.summary-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 18px;min-width:112px;flex-shrink:0;cursor:pointer;transition:border-color .2s,transform .15s,box-shadow .2s;box-shadow:var(--shadow)}
+.summary-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(60,40,10,.15)}
+.summary-card.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(74,127,212,.2)}
+.summary-card .num{font-size:26px;font-weight:900;font-family:'JetBrains Mono',monospace;line-height:1;margin-bottom:3px}
+.summary-card .lbl{font-size:10px;color:var(--text2)}
+.c-all .num{color:var(--text)} .c-new .num{color:var(--accent)} .c-kai .num{color:var(--warn)} .c-commented .num{color:var(--accent2)}
+.toolbar{padding:8px 18px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:98;background:var(--bg);border-bottom:1px solid var(--border);}
+.search-box{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:0 10px;flex:1;min-width:200px;box-shadow:var(--shadow)}
+.search-box input{background:none;border:none;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:8px 0;outline:none;width:100%}
+.search-box input::placeholder{color:var(--muted)}
+select.fs{background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:8px 10px;outline:none;cursor:pointer;box-shadow:var(--shadow)}
+.btn-csv{display:inline-flex;align-items:center;gap:5px;background:var(--accent);color:#fff;border:none;border-radius:7px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;box-shadow:var(--shadow);transition:background .2s,transform .1s}
+.btn-csv:hover{background:#3a6fc4;transform:translateY(-1px)}
+.btn-gaichuu{display:inline-flex;align-items:center;gap:5px;background:var(--accent2);color:#fff;border:none;border-radius:7px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;box-shadow:var(--shadow);transition:background .2s,transform .1s}
+.btn-gaichuu:hover{background:#238a7e;transform:translateY(-1px)}
+.btn-seisaku{display:inline-flex;align-items:center;gap:5px;background:var(--surface);color:var(--text2);border:1.5px solid var(--border);border-radius:7px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;box-shadow:var(--shadow);transition:background .2s,border-color .2s,color .2s}
+.btn-seisaku:hover{border-color:var(--warn);color:var(--warn)}
+.btn-seisaku.active{background:rgba(201,122,10,.12);border-color:var(--warn);color:var(--warn)}
+.table-wrapper{padding:0 18px 32px;overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--surface2);border-top:1px solid var(--border);border-bottom:2px solid var(--border2)}
+th{padding:9px 8px;text-align:left;font-weight:700;font-size:10px;letter-spacing:.07em;color:var(--text2);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .15s}
+tbody tr:hover td{background:rgba(74,127,212,.04)}
+tr.week-label td{padding:5px 10px;background:var(--week-bg);border-top:2px solid var(--week-border);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.05em}
+tr.week-label .week-summary{display:inline-block;margin-left:16px;font-size:10px;font-weight:400;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:1px 10px}
+tr.week-label .wk-shinki{color:var(--accent);font-weight:700}
+tr.week-label .wk-kaizo{color:var(--warn);font-weight:700}
+td{padding:8px 8px;vertical-align:middle}
+.col-hinshuu{min-width:58px;font-size:11px} .col-kubun{min-width:50px} .col-nouki{min-width:54px;white-space:nowrap}
+.col-rya{min-width:34px;text-align:center;font-weight:700;font-size:11px;color:var(--text2)}
+.col-kojino{min-width:70px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);font-weight:700}
+.col-pjno{min-width:56px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)}
+.col-buhin{min-width:150px;max-width:210px;font-size:11px} .col-chakushu{min-width:56px;white-space:nowrap}
+.col-progress{min-width:76px;text-align:center} .col-comment{min-width:170px;max-width:250px}
+.col-hikitori{min-width:86px;max-width:130px;font-size:11px} .col-gaichuu{min-width:88px;max-width:140px}
+.col-eigyo{min-width:66px;font-size:11px;white-space:nowrap} .col-sekkei{min-width:66px;font-size:11px;white-space:nowrap}
+.kbn-badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;white-space:nowrap}
+.kbn-shinki{background:rgba(74,127,212,.12);color:#3a6fc4;border:1px solid rgba(74,127,212,.25)}
+.kbn-kaizo{background:rgba(201,122,10,.12);color:#a86200;border:1px solid rgba(201,122,10,.25)}
+.kbn-other{background:rgba(156,142,122,.1);color:var(--text2);border:1px solid var(--border)}
+.date-cell{font-family:'JetBrains Mono',monospace;font-size:11px;white-space:nowrap}
+.date-overdue{color:var(--danger);font-weight:700} .date-near{color:var(--warn);font-weight:600} .date-ok{color:var(--text2)}
+.prog-select{appearance:none;-webkit-appearance:none;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);font-family:'Noto Sans JP',sans-serif;font-size:13px;padding:3px 22px 3px 8px;cursor:pointer;outline:none;color:var(--text2);width:68px;text-align:center;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239c8e7a'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 5px center;transition:border-color .15s}
+.prog-select:hover{border-color:var(--accent)}
+.prog-select.p-maru{border-color:var(--success)!important;background-color:rgba(39,174,96,.08)!important;color:var(--success)!important;font-weight:700}
+.prog-select.p-sank{border-color:var(--warn)!important;background-color:rgba(201,122,10,.08)!important;color:var(--warn)!important;font-weight:700}
+.prog-select.p-batu{border-color:var(--danger)!important;background-color:rgba(192,57,43,.08)!important;color:var(--danger)!important;font-weight:700}
+.prog-select.p-dash{border-color:var(--muted)!important;background-color:rgba(156,142,122,.08)!important;color:var(--muted)!important;font-weight:700}
+.comment-disp{font-family:'Caveat',cursive;font-size:14px;color:#4a3820;line-height:1.4;cursor:pointer;padding:3px 6px;border-radius:4px;border:1px solid transparent;transition:border-color .2s,background .2s;min-height:26px}
+.comment-disp:hover{border-color:var(--border);background:var(--surface2)}
+.comment-disp.empty{color:var(--muted);font-size:11px;font-family:'Noto Sans JP',sans-serif;font-style:italic}
+.comment-edit-wrap{display:none}
+.comment-edit-wrap textarea{width:100%;background:var(--surface);border:1.5px solid var(--accent);border-radius:5px;color:#3a2810;font-family:'Caveat',cursive;font-size:15px;padding:5px 7px;resize:vertical;min-height:52px;outline:none;line-height:1.4}
+.comment-actions{display:flex;gap:5px;margin-top:3px}
+.btn-save{background:var(--accent);color:#fff;border:none;border-radius:4px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
+.btn-cancel{background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
+.comment-meta{font-size:9px;color:var(--muted);margin-top:1px;font-family:'JetBrains Mono',monospace}
+.gaichuu-disp{font-size:11px;color:var(--text2);line-height:1.4;cursor:pointer;padding:3px 6px;border-radius:4px;border:1px solid transparent;transition:border-color .2s,background .2s;min-height:24px}
+.gaichuu-disp:hover{border-color:var(--border);background:var(--surface2)}
+.gaichuu-disp.empty{color:var(--muted);font-style:italic}
+.gaichuu-edit-wrap{display:none}
+.gaichuu-edit-wrap textarea{width:100%;background:var(--surface);border:1.5px solid var(--accent2);border-radius:5px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:5px 7px;resize:vertical;min-height:52px;outline:none;line-height:1.5}
+.gaichuu-actions{display:flex;gap:5px;margin-top:3px}
+.btn-save-g{background:var(--accent2);color:#fff;border:none;border-radius:4px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(44,36,22,.5);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:28px;width:90%;max-width:500px;box-shadow:0 8px 32px rgba(44,36,22,.2)}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:6px;color:var(--text)}
+.modal p{font-size:11px;color:var(--text2);margin-bottom:14px;line-height:1.7}
+.modal code{background:var(--surface2);padding:2px 6px;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:11px}
+.file-label{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;color:var(--text2);font-family:'Noto Sans JP',sans-serif;margin-bottom:10px;transition:border-color .2s,color .2s}
+.file-label:hover{border-color:var(--accent);color:var(--accent)}
+.modal-preview{font-size:11px;min-height:18px;font-weight:600;margin-bottom:10px;padding:6px 8px;border-radius:4px}
+.modal-preview.ok{color:var(--success);background:rgba(39,174,96,.08)}
+.modal-preview.err{color:var(--danger);background:rgba(192,57,43,.08)}
+.modal-btns{display:flex;gap:10px;justify-content:flex-end}
+.btn-primary{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
+.btn-primary.green{background:var(--accent2)}
+.btn-primary:disabled{background:var(--muted);cursor:not-allowed}
+.btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
+.toast{position:fixed;bottom:22px;right:22px;background:var(--success);color:#fff;font-size:12px;font-weight:700;padding:10px 18px;border-radius:8px;opacity:0;transform:translateY(8px);transition:opacity .3s,transform .3s;z-index:999;pointer-events:none;box-shadow:0 4px 12px rgba(39,174,96,.35)}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* ===== 固定列ヘッダー ===== */
+#fixed-thead{
+  position:fixed;
+  top:0;left:0;right:0;
+  z-index:96;
+  overflow:hidden;
+  background:var(--surface2);
+  border-bottom:2px solid var(--border2);
+  pointer-events:none;
+}
+#fixed-thead table{
+  width:100%;
+  border-collapse:collapse;
+  table-layout:fixed;
+}
+#fixed-thead th{
+  padding:9px 8px;
+  text-align:left;
+  font-weight:700;
+  font-size:10px;
+  letter-spacing:.07em;
+  color:var(--text2);
+  white-space:nowrap;
+  background:var(--surface2);
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="logo-icon">⚙</div>設計進捗管理システム</div>
+  <span id="current-date" class="date-badge"></span>
+</header>
+<div class="summary-bar">
+  <div class="summary-card c-all active" data-filter="all"><div class="num" id="cnt-all">0</div><div class="lbl">全工事</div></div>
+  <div class="summary-card c-new"  data-filter="shinki"><div class="num" id="cnt-shinki">0</div><div class="lbl">新規</div></div>
+  <div class="summary-card c-kai"  data-filter="kaizo"><div class="num" id="cnt-kaizo">0</div><div class="lbl">改造</div></div>
+  <div class="summary-card c-commented" data-filter="commented"><div class="num" id="cnt-commented">0</div><div class="lbl">📝 コメントあり</div></div>
+</div>
+<div class="toolbar">
+  <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="search-input" placeholder="工事番号・部品名・略称・P/J・担当者で検索..."></div>
+  <select class="fs" id="sekkei-filter"><option value="">設計担当：全員</option></select>
+  <select class="fs" id="eigyo-filter"><option value="">営業担当：全員</option></select>
+  <button class="btn-seisaku" id="btn-seisaku" onclick="toggleSeisaku()">🙈 設計のみ工事を非表示</button>
+  <button class="btn-csv"     onclick="openModal('csv')">📂 工事データ更新（CSV）</button>
+  <button class="btn-gaichuu" onclick="openModal('gaichuu')">🔒 外注予定&amp;決定 更新（CSV）</button>
+</div>
+<div id="fixed-thead" style="top:0">
+<table>
+<tr>
+  <th class="col-hinshuu">①品種名</th>
+  <th class="col-kubun">②扱い</th>
+  <th class="col-nouki">③納期</th>
+  <th class="col-rya">④略称</th>
+  <th class="col-kojino">⑤工事番号</th>
+  <th class="col-pjno">⑥P/J No.</th>
+  <th class="col-buhin">⑦部品名称</th>
+  <th class="col-chakushu">⑧出図予定日</th>
+  <th class="col-progress">進捗</th>
+  <th class="col-comment">⑨コメント</th>
+  <th class="col-hikitori">⑩引取/立会/発送</th>
+  <th class="col-gaichuu">⑪外注予定&amp;決定 <span style="font-size:9px;color:var(--accent2)">🔒</span></th>
+  <th class="col-eigyo">⑫営業担当</th>
+  <th class="col-sekkei">⑬設計担当</th>
+</tr>
+</table>
+</div>
+<div class="table-wrapper">
+<table>
+<thead><tr>
+  <th class="col-hinshuu">①品種名</th>
+  <th class="col-kubun">②扱い</th>
+  <th class="col-nouki">③納期</th>
+  <th class="col-rya">④略称</th>
+  <th class="col-kojino">⑤工事番号</th>
+  <th class="col-pjno">⑥P/J No.</th>
+  <th class="col-buhin">⑦部品名称</th>
+  <th class="col-chakushu">⑧出図予定日</th>
+  <th class="col-progress">進捗</th>
+  <th class="col-comment">⑨コメント</th>
+  <th class="col-hikitori">⑩引取/立会/発送</th>
+  <th class="col-gaichuu">⑪外注予定&amp;決定 <span style="font-size:9px;color:var(--accent2)">🔒</span></th>
+  <th class="col-eigyo">⑫営業担当</th>
+  <th class="col-sekkei">⑬設計担当</th>
+</tr></thead>
+<tbody id="table-body"></tbody>
+</table>
+</div>
+
+<div class="modal-overlay" id="modal-csv">
+<div class="modal">
+  <h3>📂 工事データ更新（CSV）</h3>
+  <p>
+    Excelからエクスポートした全データCSVを選択してください。<br>
+    <strong>Shift-JIS（CP932）・UTF-8どちらのCSVにも対応しています。</strong><br>
+    カンマを含む部品名・引取情報も正確に処理します。<br>
+    コメント・外注予定&amp;決定・進捗マークは保持されます。<br>
+    <strong>更新後のデータはブラウザに自動保存され、次回開いても最新状態が維持されます。</strong>
+  </p>
+  <label class="file-label" for="csv-file">📁 CSVファイルを選択</label>
+  <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="previewCSV(this)">
+  <div class="modal-preview" id="csv-preview"></div>
+  <div class="modal-btns">
+    <button class="btn-secondary" onclick="closeModal('csv')">キャンセル</button>
+    <button class="btn-primary" id="btn-csv-apply" onclick="applyCSV()" disabled>適用する</button>
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="modal-gaichuu">
+<div class="modal">
+  <h3>🔒 外注予定&amp;決定 専用更新（CSV）</h3>
+  <p>
+    外注情報専用CSVを選択してください。<br>
+    <strong>この操作のみ「⑪外注予定&amp;決定」欄が上書きされます。</strong><br>
+    フォーマット（ヘッダー行なし）：<code>工事番号,外注内容</code>
+  </p>
+  <label class="file-label" for="gaichuu-file">📁 外注CSVファイルを選択</label>
+  <input type="file" id="gaichuu-file" accept=".csv" style="display:none" onchange="previewGaichuu(this)">
+  <div class="modal-preview" id="gaichuu-preview"></div>
+  <div class="modal-btns">
+    <button class="btn-secondary" onclick="closeModal('gaichuu')">キャンセル</button>
+    <button class="btn-primary green" id="btn-gaichuu-apply" onclick="applyGaichuu()" disabled>外注情報を更新する</button>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let PROJ_DATA = [{"id": "145820", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/15", "ryakusho": "SA", "kojino": "145820", "pjno": "-", "buhinmei": "\uff89\uff7d\uff9e\uff99\uff8f\uff86\uff8e\uff70\uff99\uff84\uff9eASSY 13\u53f7\u6a5f", "chakushu": "2026/03/13", "hikitori": "", "eigyo": "\u4e2d\u6751\u3000\u667a\u54c9", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145821", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/27", "ryakusho": "SA", "kojino": "145821", "pjno": "-", "buhinmei": "\uff89\uff7d\uff9e\uff99\uff8f\uff86\uff8e\uff70\uff99\uff84\uff9eASSY 14\u53f7\u6a5f", "chakushu": "2026/03/13", "hikitori": "", "eigyo": "\u4e2d\u6751\u3000\u667a\u54c9", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145822", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/04", "ryakusho": "SA", "kojino": "145822", "pjno": "-", "buhinmei": "\uff89\uff7d\uff9e\uff99\uff8f\uff86\uff8e\uff70\uff99\uff84\uff9eASSY 15\u53f7\u6a5f", "chakushu": "2026/03/13", "hikitori": "", "eigyo": "\u4e2d\u6751\u3000\u667a\u54c9", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145823", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/29", "ryakusho": "SA", "kojino": "145823", "pjno": "-", "buhinmei": "\uff89\uff7d\uff9e\uff99\uff8f\uff86\uff8e\uff70\uff99\uff84\uff9eASSY 16\u53f7\u6a5f", "chakushu": "2026/03/13", "hikitori": "", "eigyo": "\u4e2d\u6751\u3000\u667a\u54c9", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145824", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/08/05", "ryakusho": "SA", "kojino": "145824", "pjno": "-", "buhinmei": "\uff89\uff7d\uff9e\uff99\uff8f\uff86\uff8e\uff70\uff99\uff84\uff9eASSY 17\u53f7\u6a5f", "chakushu": "2026/03/13", "hikitori": "", "eigyo": "\u4e2d\u6751\u3000\u667a\u54c9", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145825", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/08/17", "ryakusho": "SA", "kojino": "145825", "pjno": "-", "buhinmei": "\uff89\uff7d\uff9e\uff99\uff8f\uff86\uff8e\uff70\uff99\uff84\uff9eASSY 18\u53f7\u6a5f", "chakushu": "2026/03/13", "hikitori": "", "eigyo": "\u4e2d\u6751\u3000\u667a\u54c9", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145826", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/10/19", "ryakusho": "SA", "kojino": "145826", "pjno": "-", "buhinmei": "\uff89\uff7d\uff9e\uff99\uff8f\uff86\uff8e\uff70\uff99\uff84\uff9eASSY 19\u53f7\u6a5f", "chakushu": "2026/03/13", "hikitori": "", "eigyo": "\u4e2d\u6751\u3000\u667a\u54c9", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145692", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/27", "ryakusho": "FS", "kojino": "145692", "pjno": "805D", "buhinmei": "BRACE,COWL TOP TO APRON,LH", "chakushu": "2026/03/17", "hikitori": "FS-145693\u306eLHD\u30004/25\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u9ce5\u4e95\u539f\u3000\u5eb7\u6a39", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145693", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/27", "ryakusho": "FS", "kojino": "145693", "pjno": "805D", "buhinmei": "BRACE,COWL TOP TO APRON,LH", "chakushu": "2026/03/17", "hikitori": "FS-145692\u306eRHD\u30004/25\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145586", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/12", "ryakusho": "MC", "kojino": "145586", "pjno": "J00A", "buhinmei": "BONNET ASSY", "chakushu": "2026/03/19", "hikitori": "\u5b87\u54c1\u7d0d\u54c1", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u9ce5\u4e95\u539f\u3000\u5eb7\u6a39", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145590", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/12", "ryakusho": "MC", "kojino": "145590", "pjno": "J00A", "buhinmei": "Section gauge", "chakushu": "2026/03/19", "hikitori": "\u5b87\u54c1\u7d0d\u54c1", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u6d77\u8001\u91ce\u3000\u4ec1", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145742", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/15", "ryakusho": "YD", "kojino": "145742", "pjno": "J00A", "buhinmei": "COVER-SIDE,F,No4 \u4fdd\u6301\u5177\u517c\u7528\u691c", "chakushu": "2026/03/19", "hikitori": "4/15\u7d0d\u54c1", "eigyo": "\u4e95\u4e0a\u3000\u5927\u4f5c", "sekkei": "\u5c0f\u65e9\u5ddd\u3000\u5927\u8cb4", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145802", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/20", "ryakusho": "FS", "kojino": "145802", "pjno": "806D", "buhinmei": "COVER,COWL REINFORCEMENT,UPR S", "chakushu": "2026/03/19", "hikitori": "LAB1000\u30004/17\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u5c0f\u5ddd\u3000\u7fd4", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145804", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/17", "ryakusho": "DK", "kojino": "145804", "pjno": "4B17", "buhinmei": "MAINF ASSY-INT\u7dcf\u5408\u691c\u67fb\u5177", "chakushu": "2026/03/19", "hikitori": "4/17\u7d0d\u54c1", "eigyo": "\u4e95\u4e0a\u3000\u5927\u4f5c", "sekkei": "\u5742\u672c\u3000\u5353\u6d77", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145819", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u6539\u9020", "nouki": "2026/03/31", "ryakusho": "WE", "kojino": "145819", "pjno": "NA014", "buhinmei": "\uff7d\uff97\uff72\uff83\uff9e\uff68\uff9d\uff78\uff9e\uff99\uff70\uff8c", "chakushu": "2026/03/19", "hikitori": "", "eigyo": "\u4e95\u4e0a\u3000\u5927\u4f5c", "sekkei": "\u5bae\u8107\u3000\u4e45\u7f8e\u5b50", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145690", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/25", "ryakusho": "FS", "kojino": "145690", "pjno": "806D", "buhinmei": "REINFORCEMENT ASSY.INSTRUMENT", "chakushu": "2026/03/24", "hikitori": "FS-145688\u306e\uff98\uff8b\uff9f\uff70\uff84\u30005/22\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145786", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/11", "ryakusho": "FS", "kojino": "145786", "pjno": "815D", "buhinmei": "EXTENSION,FR SIDE MEMBER,RH/LH", "chakushu": "2026/03/24", "hikitori": "5/9\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u4e2d\u5c3e\u3000\u900f\u9ebb", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145827", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u6539\u9020", "nouki": "2026/04/15", "ryakusho": "BE", "kojino": "145827", "pjno": "YP9", "buhinmei": "MEMBER COMP,FRONT SIDE,R/L", "chakushu": "2026/03/24", "hikitori": "", "eigyo": "\u4e2d\u897f\u3000\u82f1\u5e78", "sekkei": "\u5bae\u8107\u3000\u4e45\u7f8e\u5b50", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145579", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/03", "ryakusho": "MC", "kojino": "145579", "pjno": "J00A", "buhinmei": "HEAD LAMP PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u9752\u6ce2\u3000\u7a7a\u826f", "seisaku": "\u8a2d\u8a08"}, {"id": "145580", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/03", "ryakusho": "MC", "kojino": "145580", "pjno": "J00A", "buhinmei": "FRONT BUMPER PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u5ddd\u91ce\u3000\u9999\u83dc\u5b50", "seisaku": "\u8a2d\u8a08"}, {"id": "145584", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/03", "ryakusho": "MC", "kojino": "145584", "pjno": "J00A", "buhinmei": "FRONT WINDOW PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u5ddd\u5d0e\u3000\u52dd\u5247", "seisaku": "\u8a2d\u8a08"}, {"id": "145585", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/03", "ryakusho": "MC", "kojino": "145585", "pjno": "J00A", "buhinmei": "COWL GRILL PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u4e2d\u5c3e\u3000\u900f\u9ebb", "seisaku": "\u8a2d\u8a08"}, {"id": "145588", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/12", "ryakusho": "MC", "kojino": "145588", "pjno": "J00A", "buhinmei": "DOOR LATCH", "chakushu": "2026/03/25", "hikitori": "\u5b87\u54c1\u7d0d\u54c1", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u4e2d\u5c3e\u3000\u900f\u9ebb", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145592", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/03", "ryakusho": "MC", "kojino": "145592", "pjno": "J00A", "buhinmei": "FRONT SIDE GARNISH PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "", "seisaku": "\u8a2d\u8a08"}, {"id": "145593", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/03", "ryakusho": "MC", "kojino": "145593", "pjno": "J00A", "buhinmei": "REAR SIDE GARNISH PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "", "seisaku": "\u8a2d\u8a08"}, {"id": "145594", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/03", "ryakusho": "MC", "kojino": "145594", "pjno": "J00A", "buhinmei": "MLDG SIDE STEP PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "", "seisaku": "\u8a2d\u8a08"}, {"id": "145595", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/03", "ryakusho": "MC", "kojino": "145595", "pjno": "J00A", "buhinmei": "INSTRUMENT PANEL PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u5ddd\u5d0e\u3000\u52dd\u5247", "seisaku": "\u8a2d\u8a08"}, {"id": "145596", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/03", "ryakusho": "MC", "kojino": "145596", "pjno": "J00A", "buhinmei": "Fr DOOR TRIM PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u5ddd\u91ce\u3000\u9999\u83dc\u5b50", "seisaku": "\u8a2d\u8a08"}, {"id": "145701", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/08", "ryakusho": "FS", "kojino": "145701", "pjno": "806D", "buhinmei": "BOX SUB-ASSY,TORQUE,FR RH/LH", "chakushu": "2026/03/25", "hikitori": "5/7\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145705", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/08", "ryakusho": "FS", "kojino": "145705", "pjno": "806D", "buhinmei": "PANEL SUB-ASSY,SIDE,NO.3 RH/LH", "chakushu": "2026/03/25", "hikitori": "LAB1000\u4f7f\u7528\u30005/7\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145706", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/08", "ryakusho": "FS", "kojino": "145706", "pjno": "806D", "buhinmei": "REINFORCEMENT SUB-ASSY,FR PLR,", "chakushu": "2026/03/25", "hikitori": "LAB1000\u4f7f\u7528\u30005/7\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145709", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/08", "ryakusho": "FS", "kojino": "145709", "pjno": "806D", "buhinmei": "REINFOCEMENT SUB-ASSY,ROOF SI,", "chakushu": "2026/03/25", "hikitori": "LAB1000\u4f7f\u7528\u30005/7\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145717", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/07/03", "ryakusho": "MC", "kojino": "145717", "pjno": "J00A", "buhinmei": "BONNET PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "\u8a2d\u8a08\u306e\u307f", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "", "seisaku": "\u8a2d\u8a08"}, {"id": "145718", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u6539\u9020", "nouki": "2026/05/12", "ryakusho": "MC", "kojino": "145718", "pjno": "J00A", "buhinmei": "COWL GRILL PLUG GAUGE", "chakushu": "2026/03/25", "hikitori": "MC145585\u306e\u88fd\u4f5c\u5de5\u4e8b 5/12\u5b87\u54c1\u7d0d", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u4e2d\u5c3e\u3000\u900f\u9ebb", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145801", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/04/27", "ryakusho": "FS", "kojino": "145801", "pjno": "805D", "buhinmei": "PANEL,COWL TOP,INNER", "chakushu": "2026/03/25", "hikitori": "4/25\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u5185\u7530\u3000\u4e07\u99ac", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145697", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/12", "ryakusho": "FS", "kojino": "145697", "pjno": "806D", "buhinmei": "COWL ASSY", "chakushu": "2026/03/26", "hikitori": "LAB1000\u4f7f\u7528 5/11\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145700", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/12", "ryakusho": "FS", "kojino": "145700", "pjno": "806D", "buhinmei": "REINFORCEMENT SUB-ASSY,FR SI M", "chakushu": "2026/03/26", "hikitori": "LAB1000\u4f7f\u7528\u30005/11\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u6751\u4e0a\u3000\u6d69\u4e8c", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145702", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/12", "ryakusho": "FS", "kojino": "145702", "pjno": "806D", "buhinmei": "APRON SUB-ASSY,FR FENDER,RH/LH", "chakushu": "2026/03/26", "hikitori": "LAB1000\u4f7f\u7528\u30005/11\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145703", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/12", "ryakusho": "FS", "kojino": "145703", "pjno": "806D", "buhinmei": "APRON SUB-ASSY,FR FENDER,RH/LH", "chakushu": "2026/03/26", "hikitori": "LAB1000\u4f7f\u7528\u30005/11\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145704", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/12", "ryakusho": "FS", "kojino": "145704", "pjno": "806D", "buhinmei": "MEMBER SUB-ASSY,FLOOR SIDE,INN", "chakushu": "2026/03/26", "hikitori": "LAB1000\u4f7f\u7528\u30005/11\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u5ca1\u7530\u3000\u7766", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145800", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/11", "ryakusho": "FS", "kojino": "145800", "pjno": "805D", "buhinmei": "MEMBER SUB-ASSY,FLOOR SIDE,INN", "chakushu": "2026/03/27", "hikitori": "5/9\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145691", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/05", "ryakusho": "FS", "kojino": "145691", "pjno": "815D", "buhinmei": "REINFORCEMENT ASSY.INSTRUMENT", "chakushu": "2026/03/30", "hikitori": "ALL\u9244\u691c\u5177\u30006/4\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145789", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/12", "ryakusho": "MC", "kojino": "145789", "pjno": "J00A", "buhinmei": "FILLER LID & OPENER PLUG GAUGE", "chakushu": "2026/03/30", "hikitori": "\u53ce\u7d0dBOX\u8981\u30005/12\u5b87\u54c1\u7d0d\u54c1", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u9752\u6ce2\u3000\u7a7a\u826f", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145812", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/08", "ryakusho": "TE", "kojino": "145812", "pjno": "805D", "buhinmei": "\u672a\u5b9a", "chakushu": "2026/03/30", "hikitori": "5/7\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u5185\u7530\u3000\u4e07\u99ac", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145830", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/11", "ryakusho": "FS", "kojino": "145830", "pjno": "815D", "buhinmei": "REINFORCEMENT,FR SIDE MEMBER E", "chakushu": "2026/04/02", "hikitori": "", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145831", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/11", "ryakusho": "FS", "kojino": "145831", "pjno": "815D", "buhinmei": "MEMBER,RR FLOOR CROSS,NO.1", "chakushu": "2026/04/02", "hikitori": "", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145832", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/11", "ryakusho": "FS", "kojino": "145832", "pjno": "815D", "buhinmei": "REINFORCEMENT,FUEL TANK MT BRA", "chakushu": "2026/04/02", "hikitori": "", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145833", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/05/11", "ryakusho": "FS", "kojino": "145833", "pjno": "815D", "buhinmei": "BRACKET,FR SEAT INSIDE MOUNTIN", "chakushu": "2026/04/02", "hikitori": "", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145520", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/04", "ryakusho": "ME", "kojino": "145520", "pjno": "J00A", "buhinmei": "PANEL-LIFTGATE IN", "chakushu": "2026/04/03", "hikitori": "\u6a5f\u80fd\u7acb\u4f1a\u4e88\u5b9a\u30006/3\u767a\u9001", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u5c71\u4e0b\u3000\u5f70\u6d0b", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145521", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/04", "ryakusho": "ME", "kojino": "145521", "pjno": "J00A", "buhinmei": "HEADER-R", "chakushu": "2026/04/03", "hikitori": "\u6a5f\u80fd\u7acb\u4f1a\u4e88\u5b9a\u30006/3\u767a\u9001", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u4e2d\u5c3e\u3000\u900f\u9ebb", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145721", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/01", "ryakusho": "FS", "kojino": "145721", "pjno": "815D", "buhinmei": "APRON SUB-ASSY,FR FENDER,RH/LH", "chakushu": "2026/04/03", "hikitori": "LAB1000\u4f7f\u7528\u30005/30\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145722", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/01", "ryakusho": "FS", "kojino": "145722", "pjno": "815D", "buhinmei": "REINFORCEMENT SUB-ASSY,FR SIDE", "chakushu": "2026/04/03", "hikitori": "LAB1000\u4f7f\u7528\u30005/30\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u4e2d\u5c3e\u3000\u900f\u9ebb", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145723", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/01", "ryakusho": "FS", "kojino": "145723", "pjno": "815D", "buhinmei": "REINFORCEMENT SUB-ASSY,FR SI M", "chakushu": "2026/04/03", "hikitori": "LAB1000\u4f7f\u7528\u30005/30\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145726", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/01", "ryakusho": "FS", "kojino": "145726", "pjno": "815D", "buhinmei": "MEMBER SUB-ASSY,RR FLOOR CROSS", "chakushu": "2026/04/03", "hikitori": "LAB1000\u4f7f\u7528\u30005/30\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u5ca1\u7530\u3000\u7766", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145727", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/01", "ryakusho": "FS", "kojino": "145727", "pjno": "815D", "buhinmei": "PANEL SUB-ASSY,FR FLOOR,CTR", "chakushu": "2026/04/03", "hikitori": "LAB1000\u4f7f\u7528\u30005/30\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145728", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/01", "ryakusho": "FS", "kojino": "145728", "pjno": "815D", "buhinmei": "GUSSET S/A,FR OUTER PILLAR,RH/", "chakushu": "2026/04/03", "hikitori": "LAB1000\u4f7f\u7528\u30005/30\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u5ddd\u91ce\u3000\u9999\u83dc\u5b50", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145798", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/01", "ryakusho": "FS", "kojino": "145798", "pjno": "815D", "buhinmei": "MEMBER SUB-ASSY,RR FLOOR CROSS", "chakushu": "2026/04/03", "hikitori": "FS145726RHD LAB1000 5/30\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u5ca1\u7530\u3000\u7766", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145805", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/01", "ryakusho": "FS", "kojino": "145805", "pjno": "815D", "buhinmei": "REINFORCEMENT SUB-ASSY,FR SIDE", "chakushu": "2026/04/03", "hikitori": "FS-145722RHD\u30005/30\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "\u4e2d\u5c3e\u3000\u900f\u9ebb", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145388", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/08/30", "ryakusho": "DK", "kojino": "145388", "pjno": "T60T", "buhinmei": "\uff7d\uff8e\uff9f\uff72\uff97\uff70\u63a5\u7740\u6cbb\u5177", "chakushu": "2026/04/06", "hikitori": "\u7d44\u7acb\uff5e\uff8b\uff85\uff7e\u30005/\u672b\u90e8\u54c1\u9001\u308a", "eigyo": "\u4e95\u4e0a\u3000\u5927\u4f5c", "sekkei": "\u9752\u6ce2\u3000\u7a7a\u826f", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a\u3000\u5916\u6ce8"}, {"id": "145672", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/07/17", "ryakusho": "MC", "kojino": "145672", "pjno": "J00A", "buhinmei": "SIDE FRAME ASSY", "chakushu": "2026/04/10", "hikitori": "\uff95\uff86\uff6f\uff84\u5358\u4f4d\u691c\u67fb\u2192\uff86\uff6f\uff8e\uff9f\uff70\u7d0d\u54c1", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145694", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/01", "ryakusho": "FS", "kojino": "145694", "pjno": "805D", "buhinmei": "PANEL SUB-ASSY,COWL TOP,OUTER", "chakushu": "2026/04/10", "hikitori": "5/30\u767a\u9001", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145711", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/07/17", "ryakusho": "MC", "kojino": "145711", "pjno": "J00A", "buhinmei": "ROOF ASSY", "chakushu": "2026/04/10", "hikitori": "\uff95\uff86\uff6f\uff84\u5358\u4f4d\u691c\u67fb\u2192\uff86\uff6f\uff8e\uff9f\uff70\u7d0d\u54c1", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145759", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/07/17", "ryakusho": "MC", "kojino": "145759", "pjno": "J00A", "buhinmei": "CMM SUPPORT", "chakushu": "2026/04/10", "hikitori": "\uff95\uff86\uff6f\uff84\u3067\u691c\u67fb", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u6751\u4e0a\u3000\u6d69\u4e8c", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145829", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/03", "ryakusho": "FS", "kojino": "145829", "pjno": "805D", "buhinmei": "REINFORCE,ROOF SIDE OUTER,LH", "chakushu": "2026/04/11", "hikitori": "", "eigyo": "\u6709\u672b\u3000\u5b8f\u662d", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145663", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/19", "ryakusho": "ZZ", "kojino": "145663", "pjno": "J00A", "buhinmei": "Fr.UCF", "chakushu": "2026/04/28", "hikitori": "MP-FrUCF \u6a5f\u80fd\u7acb\u4f1a\u6709 \uff8f\uff82\uff80\uff9e\u3067K3\u6709", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u5c71\u4e0b\u3000\u5f70\u6d0b", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145664", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2026/06/19", "ryakusho": "ZZ", "kojino": "145664", "pjno": "J00A", "buhinmei": "Rr.UCF", "chakushu": "2026/04/28", "hikitori": "MP-RrUCF \u6a5f\u80fd\u7acb\u4f1a\u6709 \uff8f\uff82\uff80\uff9e\u3067K3\u6709", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "\u5c0f\u5ddd\u3000\u7fd4", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145818", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u6539\u9020", "nouki": "2026/07/17", "ryakusho": "TM", "kojino": "145818", "pjno": "900B", "buhinmei": "IP Area C/F\u7acb\u4f1a\u5b8c\u4e86\u691c\u53ce\u5206", "chakushu": "2026/05/14", "hikitori": "6/1\u5f15\u53d6 7/6\u7cbe\u5ea6\u7acb\u4f1a 7/16\u767a\u9001", "eigyo": "\u4e2d\u6751\u3000\u667a\u54c9", "sekkei": "", "seisaku": "\u8a2d\u8a08\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145665", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u6539\u9020", "nouki": "2026/10/20", "ryakusho": "ZZ", "kojino": "145665", "pjno": "J00A", "buhinmei": "Fr.UCF", "chakushu": "", "hikitori": "ZZ-145663\u3092MC\u2192\uff86\uff6f\uff8e\uff9f\uff70\u306b\u642c\u9001\u5de5\u4e8b", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "", "seisaku": "\u3000\u3000\u3000\u88fd\u4f5c\u3000\u3000\u3000\u3000\u5916\u6ce8"}, {"id": "145666", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u6539\u9020", "nouki": "2026/10/20", "ryakusho": "ZZ", "kojino": "145666", "pjno": "J00A", "buhinmei": "Rr.UCF", "chakushu": "", "hikitori": "ZZ-145664\u3092MC\u2192\uff86\uff6f\uff8e\uff9f\uff70\u306b\u642c\u9001\u5de5\u4e8b", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "", "seisaku": "\u3000\u3000\u3000\u88fd\u4f5c\u3000\u3000\u3000\u3000\u5916\u6ce8"}, {"id": "145667", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u65b0\u898f", "nouki": "2027/01/28", "ryakusho": "ZZ", "kojino": "145667", "pjno": "J00A", "buhinmei": "Service for Front and Rear UCF", "chakushu": "", "hikitori": "\u30bf\u30a4AAT\u73fe\u5730\u636e\u4ed8\u5de5\u4e8b", "eigyo": "\u5ddd\u53e3\u3000\u5468\u5e73", "sekkei": "", "seisaku": "\u3000\u3000\u3000\u88fd\u4f5c\u3000\u6e2c\u5b9a"}, {"id": "145775", "hinshuu": "\u5de5\u4e8b\u4e2d", "kubun": "\u6539\u9020", "nouki": "2026/03/27", "ryakusho": "DK", "kojino": "145775", "pjno": "T43A", "buhinmei": "\uff83\uff70\uff99\uff79\uff9e\uff70\uff84\u5bf8\u6cd5\u691c\u67fb\u6a5f", "chakushu": "", "hikitori": "\u73fe\u5730\u4f5c\u696d\u6709", "eigyo": "\u4e95\u4e0a\u3000\u5927\u4f5c", "sekkei": "", "seisaku": "\u3000\u3000\u3000\u88fd\u4f5c\u3000\u3000\u3000\u3000\u5916\u6ce8"}];
+
+const LS  = k => { try{ return JSON.parse(localStorage.getItem(k)||'{}'); }catch(e){ return {}; }};
+const LSW = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+
+// 工事データをlocalStorageに保存・復元
+const STORAGE_KEY_DATA = 'sc3_proj_data';
+function saveProjData(){
+  try{
+    LSW(STORAGE_KEY_DATA, PROJ_DATA);
+    return true;
+  }catch(e){
+    console.error('保存失敗:', e);
+    return false;
+  }
+}
+function loadProjData(){
+  try{
+    const saved = localStorage.getItem(STORAGE_KEY_DATA);
+    if(saved){
+      const parsed = JSON.parse(saved);
+      if(Array.isArray(parsed) && parsed.length > 0){ PROJ_DATA = parsed; return true; }
+    }
+  }catch(e){ console.error('復元失敗:', e); }
+  return false;
+}
+
+let comments     = LS('sc3_comments');
+let commentDates = LS('sc3_cdates');
+let progmarks    = LS('sc3_prog');
+let gaichuu      = LS('sc3_gaichuu');
+let gaichuuDates = LS('sc3_gdates');
+
+let fMain='all', fSekkei='', fEigyo='', fSearch='', fSeisaku=false;
+
+// ===== HELPERS =====
+function getWeekMon(s){
+  if(!s) return null;
+  const p=s.split('/'); if(p.length<3) return null;
+  const dt=new Date(+p[0],+p[1]-1,+p[2]);
+  const diff=dt.getDay()===0?-6:1-dt.getDay();
+  const m=new Date(dt); m.setDate(dt.getDate()+diff);
+  return `${m.getFullYear()}/${String(m.getMonth()+1).padStart(2,'0')}/${String(m.getDate()).padStart(2,'0')}`;
+}
+function fmtWeekLabel(s){
+  const p=s.split('/');
+  const m=new Date(+p[0],+p[1]-1,+p[2]);
+  const f=new Date(m); f.setDate(m.getDate()+4);
+  const d=dt=>`${dt.getMonth()+1}/${dt.getDate()}`;
+  return `${d(m)}(月) 〜 ${d(f)}(金)`;
+}
+function dateCls(s){
+  if(!s) return 'date-ok';
+  const p=s.split('/'); if(p.length<3) return 'date-ok';
+  const t=new Date(+p[0],+p[1]-1,+p[2]);
+  const now=new Date(); now.setHours(0,0,0,0);
+  const diff=(t-now)/86400000;
+  return diff<0?'date-overdue':diff<=7?'date-near':'date-ok';
+}
+function fmtDate(s){
+  if(!s) return '—';
+  const p=s.split('/'); if(p.length<3) return s;
+  return `${+p[1]}/${+p[2]}`;
+}
+function kubunClass(k){
+  if(!k) return 'kbn-other';
+  if(k.includes('新規')) return 'kbn-shinki';
+  if(k.includes('改造')||k.includes('改')) return 'kbn-kaizo';
+  return 'kbn-other';
+}
+function progCls(v){ return v==='○'?'p-maru':v==='△'?'p-sank':v==='✖'?'p-batu':v==='－'?'p-dash':''; }
+
+// ===== RENDER =====
+function getFiltered(){
+  const q=fSearch.toLowerCase();
+  return PROJ_DATA.filter(p=>{
+    const hasSeisakuOnly=p.seisaku&&p.seisaku.includes('設計')&&!p.seisaku.includes('製作');
+    if(fSeisaku&&hasSeisakuOnly) return false;
+    const mM=fMain==='all'
+      ||(fMain==='shinki'&&p.kubun.includes('新規'))
+      ||(fMain==='kaizo'&&(p.kubun.includes('改造')||p.kubun.includes('改')))
+      ||(fMain==='commented'&&!!comments[p.id]);
+    return !!p.chakushu&&mM&&(!fSekkei||p.sekkei===fSekkei)&&(!fEigyo||p.eigyo===fEigyo)
+      &&(!q||[p.kojino,p.buhinmei,p.sekkei,p.eigyo,p.ryakusho,p.pjno].some(v=>(v||'').toLowerCase().includes(q)));
+  });
+}
+function renderTable(){
+  const tbody=document.getElementById('table-body');
+  tbody.innerHTML='';
+  let lastWk='__INIT__';
+  getFiltered().forEach(p=>{
+    const wk=getWeekMon(p.chakushu)||'__NODATE__';
+    if(wk!==lastWk){
+      const wkAll=PROJ_DATA.filter(r=>{
+        if((getWeekMon(r.chakushu)||'__NODATE__')!==wk) return false;
+        if(!r.chakushu) return false;
+        if(fSeisaku&&r.seisaku&&r.seisaku.includes('設計')&&!r.seisaku.includes('製作')) return false;
+        return true;
+      });
+      const sk=wkAll.filter(r=>r.kubun.includes('新規')).length;
+      const kz=wkAll.filter(r=>r.kubun.includes('改造')||r.kubun.includes('改')).length;
+      const lbl=wk==='__NODATE__'?'📅 日付未定':`📅 週: ${fmtWeekLabel(wk)}`;
+      const sum=`<span class="week-summary"><span class="wk-shinki">新規 ${sk}工事</span>　<span class="wk-kaizo">改造 ${kz}工事</span>　出図予定</span>`;
+      const tr=document.createElement('tr'); tr.className='week-label';
+      tr.innerHTML=`<td colspan="14">${lbl}${sum}</td>`;
+      tbody.appendChild(tr); lastWk=wk;
+    }
+    const com=comments[p.id]||'',cd=commentDates[p.id]||'';
+    const prg=progmarks[p.id]||'',gai=gaichuu[p.id]||'',gd=gaichuuDates[p.id]||'';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="col-hinshuu">${p.hinshuu}</td>
+      <td class="col-kubun"><span class="kbn-badge ${kubunClass(p.kubun)}">${p.kubun}</span></td>
+      <td class="col-nouki"><span class="date-cell ${dateCls(p.nouki)}">${fmtDate(p.nouki)}</span></td>
+      <td class="col-rya">${p.ryakusho}</td>
+      <td class="col-kojino">${p.kojino}</td>
+      <td class="col-pjno">${p.pjno}</td>
+      <td class="col-buhin">${p.buhinmei}</td>
+      <td class="col-chakushu"><span class="date-cell ${dateCls(p.chakushu)}">${fmtDate(p.chakushu)}</span></td>
+      <td class="col-progress" style="text-align:center">
+        <select class="prog-select ${progCls(prg)}" onchange="setProg('${p.id}',this)">
+          <option value=""  ${prg===''  ?'selected':''}></option>
+          <option value="○" ${prg==='○' ?'selected':''}>○</option>
+          <option value="△" ${prg==='△' ?'selected':''}>△</option>
+          <option value="✖" ${prg==='✖' ?'selected':''}>✖</option>
+          <option value="－" ${prg==='－'?'selected':''}>－</option>
+        </select>
+      </td>
+      <td class="col-comment" id="cc-${p.id}">
+        <div class="comment-disp ${com?'':'empty'}" id="cd-${p.id}" onclick="editComment('${p.id}')">${com||'クリックして入力…'}</div>
+        ${cd?`<div class="comment-meta">更新:${cd}</div>`:''}
+        <div class="comment-edit-wrap" id="ce-${p.id}">
+          <textarea id="cta-${p.id}">${com}</textarea>
+          <div class="comment-actions">
+            <button class="btn-save" onclick="saveComment('${p.id}')">保存</button>
+            <button class="btn-cancel" onclick="cancelComment('${p.id}')">取消</button>
+          </div>
+        </div>
+      </td>
+      <td class="col-hikitori">${p.hikitori||'—'}</td>
+      <td class="col-gaichuu" id="gc-${p.id}">
+        <div class="gaichuu-disp ${gai?'':'empty'}" id="gd-${p.id}" onclick="editGaichuu('${p.id}')">${gai||'（未入力）'}</div>
+        ${gd?`<div class="comment-meta">更新:${gd} 🔒</div>`:'<div class="comment-meta" style="color:var(--accent2);opacity:.5;font-size:9px">🔒専用更新のみ</div>'}
+        <div class="gaichuu-edit-wrap" id="ge-${p.id}">
+          <textarea id="gta-${p.id}">${gai}</textarea>
+          <div class="gaichuu-actions">
+            <button class="btn-save-g" onclick="saveGaichuu('${p.id}')">保存</button>
+            <button class="btn-cancel" onclick="cancelGaichuu('${p.id}')">取消</button>
+          </div>
+        </div>
+      </td>
+      <td class="col-eigyo">${p.eigyo||'—'}</td>
+      <td class="col-sekkei">${p.sekkei||'—'}</td>`;
+    tbody.appendChild(tr);
+  });
+  updateCounts();
+  setTimeout(()=>{ updateStickyOffsets(); syncFixedHeader(); }, 0);
+}
+function updateCounts(){
+  const base=PROJ_DATA.filter(p=>{
+    if(!p.chakushu) return false;
+    if(fSeisaku&&p.seisaku&&p.seisaku.includes('設計')&&!p.seisaku.includes('製作')) return false;
+    return true;
+  });
+  document.getElementById('cnt-all').textContent=base.length;
+  document.getElementById('cnt-shinki').textContent=base.filter(p=>p.kubun.includes('新規')).length;
+  document.getElementById('cnt-kaizo').textContent=base.filter(p=>p.kubun.includes('改造')||p.kubun.includes('改')).length;
+  document.getElementById('cnt-commented').textContent=Object.keys(comments).filter(k=>comments[k]).length;
+}
+
+// ===== PROGRESS =====
+function toggleSeisaku(){
+  fSeisaku=!fSeisaku;
+  const btn=document.getElementById('btn-seisaku');
+  btn.classList.toggle('active',fSeisaku);
+  btn.textContent=fSeisaku?'🙈 設計のみ工事を非表示中':'🙈 設計のみ工事を非表示';
+  renderTable();
+}
+function setProg(id,sel){ progmarks[id]=sel.value; LSW('sc3_prog',progmarks); sel.className='prog-select '+progCls(sel.value); }
+
+// ===== COMMENT =====
+function editComment(id){ document.getElementById(`cd-${id}`).style.display='none'; document.getElementById(`ce-${id}`).style.display='block'; document.getElementById(`cta-${id}`).focus(); }
+function cancelComment(id){ document.getElementById(`ce-${id}`).style.display='none'; document.getElementById(`cd-${id}`).style.display=''; }
+function saveComment(id){
+  const val=document.getElementById(`cta-${id}`).value.trim();
+  comments[id]=val; const now=new Date();
+  commentDates[id]=`${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  LSW('sc3_comments',comments); LSW('sc3_cdates',commentDates);
+  const d=document.getElementById(`cd-${id}`);
+  d.textContent=val||'クリックして入力…'; d.className=`comment-disp ${val?'':'empty'}`; d.style.display='';
+  document.getElementById(`ce-${id}`).style.display='none';
+  const cell=document.getElementById(`cc-${id}`);
+  let m=cell.querySelector('.comment-meta');
+  if(!m){ m=document.createElement('div'); m.className='comment-meta'; cell.insertBefore(m,cell.querySelector('.comment-edit-wrap')); }
+  m.textContent=`更新:${commentDates[id]}`; updateCounts(); showToast('コメントを保存しました');
+}
+
+// ===== GAICHUU =====
+function editGaichuu(id){ document.getElementById(`gd-${id}`).style.display='none'; document.getElementById(`ge-${id}`).style.display='block'; document.getElementById(`gta-${id}`).focus(); }
+function cancelGaichuu(id){ document.getElementById(`ge-${id}`).style.display='none'; document.getElementById(`gd-${id}`).style.display=''; }
+function saveGaichuu(id){
+  const val=document.getElementById(`gta-${id}`).value.trim();
+  gaichuu[id]=val; const now=new Date();
+  gaichuuDates[id]=`${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  LSW('sc3_gaichuu',gaichuu); LSW('sc3_gdates',gaichuuDates);
+  const d=document.getElementById(`gd-${id}`); d.textContent=val||'（未入力）'; d.className=`gaichuu-disp ${val?'':'empty'}`; d.style.display='';
+  document.getElementById(`ge-${id}`).style.display='none';
+  const cell=document.getElementById(`gc-${id}`);
+  let m=cell.querySelector('.comment-meta');
+  if(!m){ m=document.createElement('div'); m.className='comment-meta'; cell.insertBefore(m,cell.querySelector('.gaichuu-edit-wrap')); }
+  m.innerHTML=`更新:${gaichuuDates[id]} 🔒`; showToast('外注予定&決定を保存しました');
+}
+
+// ===== CP932デコーダ (Shift-JIS/CP932をブラウザで確実に読む) =====
+// ArrayBufferをCP932文字列に変換
+function decodeCP932(buffer){
+  // TextDecoderがcp932/shift-jisをサポートしているブラウザはそれを使う
+  const encodings = ['shift-jis','cp932','x-sjis','windows-31j'];
+  for(const enc of encodings){
+    try{
+      const dec = new TextDecoder(enc);
+      return dec.decode(buffer);
+    }catch(e){ continue; }
+  }
+  // フォールバック: UTF-8
+  return new TextDecoder('utf-8').decode(buffer);
+}
+
+// ===== RFC4180準拠CSVパーサー =====
+function parseCSV(text){
+  const rows=[]; let cur='',inQ=false,row=[];
+  for(let i=0;i<text.length;i++){
+    const c=text[i],n=text[i+1];
+    if(inQ){
+      if(c==='"'&&n==='"'){ cur+='"'; i++; }
+      else if(c==='"'){ inQ=false; }
+      else{ cur+=c; }
+    } else {
+      if(c==='"'){ inQ=true; }
+      else if(c===','){ row.push(cur); cur=''; }
+      else if(c==='\n'||(c==='\r'&&n==='\n')){
+        row.push(cur); cur='';
+        if(row.some(v=>v.trim()!=='')) rows.push(row);
+        row=[]; if(c==='\r') i++;
+      } else { cur+=c; }
+    }
+  }
+  if(cur!==''||row.length){ row.push(cur); if(row.some(v=>v.trim()!=='')) rows.push(row); }
+  return rows;
+}
+
+// 列名→キー マッピング
+const COL_MAP = {
+  '略称':'ryakusho', '社内工事番号':'id', '着手・出図予定日':'chakushu',
+  '設計担当者':'sekkei', '品種名':'hinshuu', '製造区分扱い名':'kubun',
+  '納期':'nouki', 'P/J No.':'pjno', '部品名称':'buhinmei',
+  '引取/立会/発送':'hikitori', '営業担当者':'eigyo',
+  '制作内容':'_j', '出図完了日':'_c'
+};
+
+let pendingCSV=null;
+function previewCSV(input){
+  const file=input.files[0]; if(!file) return;
+  const prev=document.getElementById('csv-preview');
+  const applyBtn=document.getElementById('btn-csv-apply');
+  prev.className='modal-preview'; prev.textContent='読み込み中...'; applyBtn.disabled=true;
+
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      // CP932でデコード
+      const text=decodeCP932(e.target.result);
+      const rows=parseCSV(text);
+      if(rows.length<2){ prev.className='modal-preview err'; prev.textContent='⚠ データ行がありません'; return; }
+
+      // ヘッダー行でインデックスマップ作成（前後の空白・BOMを除去）
+      const headers=rows[0].map(h=>h.trim().replace(/^\uFEFF/,''));
+      const idx={};
+      headers.forEach((h,i)=>{ if(COL_MAP[h]) idx[COL_MAP[h]]=i; });
+
+      // 必須列チェック
+      const required={id:'社内工事番号',hinshuu:'品種名',kubun:'製造区分扱い名',_j:'制作内容',_c:'出図完了日'};
+      const missing=Object.entries(required).filter(([k])=>idx[k]===undefined).map(([,n])=>n);
+      if(missing.length>0){
+        prev.className='modal-preview err';
+        prev.textContent=`⚠ 列が見つかりません: ${missing.join('、')}`;
+        return;
+      }
+
+      const get=(row,key)=>idx[key]!==undefined?(row[idx[key]]||'').trim():'';
+
+      const parsed=[];
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];
+        if(get(r,'_c')) continue;                        // 出図完了済は除外
+        const j=get(r,'_j');
+        if(!j.includes('設計')&&!j.includes('製作')) continue;
+        if(!get(r,'hinshuu').includes('工事中')) continue;
+        parsed.push({
+          id:       get(r,'id'),
+          hinshuu:  get(r,'hinshuu'),
+          kubun:    get(r,'kubun'),
+          nouki:    get(r,'nouki'),
+          ryakusho: get(r,'ryakusho'),
+          kojino:   get(r,'id'),
+          pjno:     get(r,'pjno'),
+          buhinmei: get(r,'buhinmei'),
+          chakushu: get(r,'chakushu'),
+          hikitori: get(r,'hikitori'),
+          eigyo:    get(r,'eigyo'),
+          sekkei:   get(r,'sekkei'),
+          seisaku:  j,
+        });
+      }
+      // 出図予定日の昇順ソート（数値比較で確実に並べる）
+      sortByDate(parsed);
+      pendingCSV=parsed;
+      prev.className='modal-preview ok';
+      prev.textContent=`✓ ${parsed.length} 件を検出｜コメント・外注・進捗は保持されます`;
+      applyBtn.disabled=false;
+    }catch(err){
+      prev.className='modal-preview err';
+      prev.textContent='⚠ 読み込みエラー: '+err.message;
+    }
+  };
+  // ArrayBufferで読む（CP932対応のため）
+  reader.readAsArrayBuffer(file);
+}
+function applyCSV(){
+  if(!pendingCSV) return;
+  PROJ_DATA=sortByDate(pendingCSV); pendingCSV=null;
+  // モーダルを先に確実に閉じてからDOM更新
+  const modalEl = document.getElementById('modal-csv');
+  if(modalEl) modalEl.classList.remove('open');
+  // ファイル入力をリセット（同じファイル再選択を可能に）
+  const fi = document.getElementById('csv-file');
+  if(fi) fi.value='';
+  document.getElementById('btn-csv-apply').disabled=true;
+  document.getElementById('csv-preview').textContent='';
+  document.getElementById('csv-preview').className='modal-preview';
+  setTimeout(()=>{
+    populateFilters();
+    renderTable();
+    saveProjData();
+    showToast(`工事データを ${PROJ_DATA.length} 件に更新・保存しました`);
+  }, 50);
+}
+
+// ===== GAICHUU CSV =====
+let pendingGaichuu=null;
+function previewGaichuu(input){
+  const file=input.files[0]; if(!file) return;
+  const prev=document.getElementById('gaichuu-preview');
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const text=decodeCP932(e.target.result);
+    const rows=parseCSV(text);
+    pendingGaichuu={};
+    rows.forEach(r=>{ if(r.length>=2&&r[0].trim()){ pendingGaichuu[r[0].trim()]=r.slice(1).join(',').trim(); }});
+    const cnt=Object.keys(pendingGaichuu).length;
+    prev.className='modal-preview '+(cnt?'ok':'err');
+    prev.textContent=cnt?`✓ ${cnt} 件の外注情報を検出`:'⚠ データが見つかりません';
+    document.getElementById('btn-gaichuu-apply').disabled=cnt===0;
+  };
+  reader.readAsArrayBuffer(file);
+}
+function applyGaichuu(){
+  if(!pendingGaichuu) return;
+  const now=new Date(),ts=`${now.getMonth()+1}/${now.getDate()} [CSV]`;
+  Object.entries(pendingGaichuu).forEach(([id,val])=>{ gaichuu[id]=val; gaichuuDates[id]=ts; });
+  LSW('sc3_gaichuu',gaichuu); LSW('sc3_gdates',gaichuuDates);
+  pendingGaichuu=null; closeModal('gaichuu'); renderTable();
+  showToast(`外注予定&決定を ${Object.keys(gaichuu).length} 件更新しました`);
+}
+
+// ===== MODAL =====
+function openModal(t){ document.getElementById(`modal-${t}`).classList.add('open'); }
+function closeModal(t){ document.getElementById(`modal-${t}`).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{ if(e.target===el) el.classList.remove('open'); }));
+
+// ===== FILTER EVENTS =====
+document.querySelectorAll('.summary-card').forEach(c=>c.addEventListener('click',()=>{
+  document.querySelectorAll('.summary-card').forEach(x=>x.classList.remove('active'));
+  c.classList.add('active'); fMain=c.dataset.filter; renderTable();
+}));
+document.getElementById('search-input').addEventListener('input',e=>{ fSearch=e.target.value; renderTable(); });
+document.getElementById('sekkei-filter').addEventListener('change',e=>{ fSekkei=e.target.value; renderTable(); });
+document.getElementById('eigyo-filter').addEventListener('change',e=>{ fEigyo=e.target.value; renderTable(); });
+
+function populateFilters(){
+  const ss=document.getElementById('sekkei-filter'), es=document.getElementById('eigyo-filter');
+  const sv=ss.value, ev=es.value;
+  ss.innerHTML='<option value="">設計担当：全員</option>';
+  es.innerHTML='<option value="">営業担当：全員</option>';
+  [...new Set(PROJ_DATA.map(p=>p.sekkei).filter(Boolean))].sort().forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; ss.appendChild(o); });
+  [...new Set(PROJ_DATA.map(p=>p.eigyo).filter(Boolean))].sort().forEach(n=>{ const o=document.createElement('option'); o.value=n; o.textContent=n; es.appendChild(o); });
+  ss.value=sv; es.value=ev;
+}
+
+// ===== TOAST =====
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent='✓ '+msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+
+// ===== DATE SORT (グローバル共通) =====
+function dateToNum(s){
+  if(!s) return 99999999;
+  const p=s.split('/');
+  if(p.length===3) return (+p[0])*10000+(+p[1])*100+(+p[2]);
+  const q=s.split('-');
+  if(q.length===3) return (+q[0])*10000+(+q[1])*100+(+q[2]);
+  return 99999999;
+}
+function sortByDate(arr){ arr.sort((a,b)=>dateToNum(a.chakushu)-dateToNum(b.chakushu)); return arr; }
+
+// ===== INIT =====
+(()=>{ const n=new Date(),d=['日','月','火','水','木','金','土']; document.getElementById('current-date').textContent=`${n.getFullYear()}/${String(n.getMonth()+1).padStart(2,'0')}/${String(n.getDate()).padStart(2,'0')} (${d[n.getDay()]})`; })();
+// localStorageに保存済みデータがあれば復元、なければ埋め込み初期データをソートして使用
+if(!loadProjData()){ sortByDate(PROJ_DATA); }
+populateFilters();
+renderTable();
+
+// sticky オフセットを動的に計算（各エリアの実際の高さに合わせる）
+function updateStickyOffsets(){
+  const hEl = document.querySelector('header');
+  const sEl = document.querySelector('.summary-bar');
+  const tEl = document.querySelector('.toolbar');
+  if(!hEl||!sEl||!tEl) return;
+  const hH = hEl.getBoundingClientRect().height;
+  const sH = sEl.getBoundingClientRect().height;
+  const tH = tEl.getBoundingClientRect().height;
+  sEl.style.top = hH + 'px';
+  tEl.style.top = (hH + sH) + 'px';
+  // 固定ヘッダー行の位置を更新
+  const fh = document.getElementById('fixed-thead');
+  if(fh) fh.style.top = (hH + sH + tH) + 'px';
+}
+
+// 固定ヘッダーの各列幅を実テーブルと同期
+function syncFixedHeader(){
+  const realThs = document.querySelectorAll('table:not(#fixed-thead table) thead th');
+  const fixedThs = document.querySelectorAll('#fixed-thead th');
+  if(!realThs.length || !fixedThs.length) return;
+  // table-wrapperのスクロール位置も同期
+  const wrapper = document.querySelector('.table-wrapper');
+  const fixedDiv = document.getElementById('fixed-thead');
+  // 実テーブルの各列幅を取得してfixedに適用
+  realThs.forEach((th, i) => {
+    if(fixedThs[i]){
+      const w = th.getBoundingClientRect().width;
+      fixedThs[i].style.width = w + 'px';
+      fixedThs[i].style.minWidth = w + 'px';
+    }
+  });
+  // 実テーブル全体の幅を固定ヘッダーのtableにも適用
+  const realTable = document.querySelector('table:not(#fixed-thead table)');
+  if(realTable && fixedDiv){
+    const fixedTable = fixedDiv.querySelector('table');
+    fixedTable.style.width = realTable.getBoundingClientRect().width + 'px';
+  }
+  // 横スクロール同期
+  if(wrapper && fixedDiv){
+    fixedDiv.style.left = wrapper.getBoundingClientRect().left + 'px';
+    fixedDiv.style.right = (window.innerWidth - wrapper.getBoundingClientRect().right) + 'px';
+    fixedDiv.scrollLeft = wrapper.scrollLeft;
+  }
+}
+
+// 横スクロール・リサイズ対応
+window.addEventListener('resize', ()=>{ updateStickyOffsets(); syncFixedHeader(); });
+[0, 200, 500].forEach(ms => setTimeout(()=>{
+  updateStickyOffsets();
+  syncFixedHeader();
+  if(ms === 0){
+    const wrapper = document.querySelector('.table-wrapper');
+    if(wrapper) wrapper.addEventListener('scroll', function(){
+      const fixedDiv = document.getElementById('fixed-thead');
+      if(fixedDiv) fixedDiv.querySelector('table').style.marginLeft = -this.scrollLeft + 'px';
+    });
+  }
+}, ms));
+
+</script>
+</body>
+</html>
