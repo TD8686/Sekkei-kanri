@@ -73,20 +73,15 @@ td{padding:8px 8px;vertical-align:middle}
 .prog-select.p-dash{border-color:var(--muted)!important;background-color:rgba(156,142,122,.08)!important;color:var(--muted)!important;font-weight:700}
 .comment-disp{font-family:'Caveat',cursive;font-size:14px;color:#4a3820;line-height:1.4;cursor:pointer;padding:3px 6px;border-radius:4px;border:1px solid transparent;transition:border-color .2s,background .2s;min-height:26px}
 .comment-disp:hover{border-color:var(--border);background:var(--surface2)}
-.comment-disp.empty{color:var(--muted);font-size:11px;font-family:'Noto Sans JP',sans-serif;font-style:italic}
+.comment-disp.empty{visibility:hidden;height:20px}
 .comment-edit-wrap{display:none}
 .comment-edit-wrap textarea{width:100%;background:var(--surface);border:1.5px solid var(--accent);border-radius:5px;color:#3a2810;font-family:'Caveat',cursive;font-size:15px;padding:5px 7px;resize:vertical;min-height:52px;outline:none;line-height:1.4}
 .comment-actions{display:flex;gap:5px;margin-top:3px}
 .btn-save{background:var(--accent);color:#fff;border:none;border-radius:4px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
 .btn-cancel{background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:4px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
 .comment-meta{font-size:9px;color:var(--muted);margin-top:1px;font-family:'JetBrains Mono',monospace}
-.gaichuu-disp{font-size:11px;color:var(--text2);line-height:1.4;cursor:pointer;padding:3px 6px;border-radius:4px;border:1px solid transparent;transition:border-color .2s,background .2s;min-height:24px}
-.gaichuu-disp:hover{border-color:var(--border);background:var(--surface2)}
-.gaichuu-disp.empty{color:var(--muted);font-style:italic}
-.gaichuu-edit-wrap{display:none}
-.gaichuu-edit-wrap textarea{width:100%;background:var(--surface);border:1.5px solid var(--accent2);border-radius:5px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:5px 7px;resize:vertical;min-height:52px;outline:none;line-height:1.5}
-.gaichuu-actions{display:flex;gap:5px;margin-top:3px}
-.btn-save-g{background:var(--accent2);color:#fff;border:none;border-radius:4px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
+.gaichuu-ta{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:11px;padding:5px 7px;resize:vertical;min-height:42px;outline:none;line-height:1.5;transition:border-color .2s;box-sizing:border-box;}
+.gaichuu-ta:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(42,157,143,.15)}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(44,36,22,.5);z-index:200;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
 .modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:28px;width:90%;max-width:500px;box-shadow:0 8px 32px rgba(44,36,22,.2)}
@@ -137,6 +132,7 @@ td{padding:8px 8px;vertical-align:middle}
 <header>
   <div class="logo"><div class="logo-icon">⚙</div>設計進捗管理システム</div>
   <span id="current-date" class="date-badge"></span>
+<span id="gas-status" style="font-size:10px;color:var(--muted);margin-left:8px"></span>
 </header>
 <div class="summary-bar">
   <div class="summary-card c-all active" data-filter="all"><div class="num" id="cnt-all">0</div><div class="lbl">全工事</div></div>
@@ -242,6 +238,46 @@ const LSW = (k,v) => localStorage.setItem(k, JSON.stringify(v));
 
 // 工事データをlocalStorageに保存・復元
 const STORAGE_KEY_DATA = 'sc3_proj_data';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbznYCY5tGtk62CFMlM4QMQxFuB9y4yxfK4KDCusUDpnSWdpxM5bwnEfXkijYyV4QBk7/exec';
+
+// ===== GAS通信 =====
+let gasData = {};  // GASから取得した共有データキャッシュ
+
+// GASから全データを取得してローカルに反映
+async function fetchGasData(){
+  try{
+    const res = await fetch(GAS_URL + '?t=' + Date.now());
+    const json = await res.json();
+    gasData = json;
+    // GASデータをローカル変数に反映
+    Object.entries(json).forEach(([id, d])=>{
+      if(d.comment    !== undefined) comments[id]     = d.comment;
+      if(d.commentDate!== undefined) commentDates[id] = d.commentDate;
+      if(d.progress   !== undefined) progmarks[id]    = d.progress;
+      if(d.gaichuu    !== undefined) gaichuu[id]      = d.gaichuu;
+      if(d.gaichuuDate!== undefined) gaichuuDates[id] = d.gaichuuDate;
+    });
+    return true;
+  }catch(e){ console.error('GAS取得失敗:', e); return false; }
+}
+
+// GASに1件書き込む
+async function pushGasData(id){
+  const payload = {
+    id,
+    comment:     comments[id]||'',
+    commentDate: commentDates[id]||'',
+    progress:    progmarks[id]||'',
+    gaichuu:     gaichuu[id]||'',
+    gaichuuDate: gaichuuDates[id]||''
+  };
+  try{
+    await fetch(GAS_URL, {
+      method:'POST',
+      body: JSON.stringify(payload)
+    });
+  }catch(e){ console.error('GAS書込失敗:', e); }
+}
 function saveProjData(){
   try{
     LSW(STORAGE_KEY_DATA, PROJ_DATA);
@@ -363,28 +399,18 @@ function renderTable(){
           <option value="－" ${prg==='－'?'selected':''}>－</option>
         </select>
       </td>
-      <td class="col-comment" id="cc-${p.id}">
-        <div class="comment-disp ${com?'':'empty'}" id="cd-${p.id}" onclick="editComment('${p.id}')">${com||'クリックして入力…'}</div>
+      <td class="col-comment">
+        <textarea class="comment-ta" id="cta-${p.id}"
+          onchange="saveComment('${p.id}')"
+          onblur="saveComment('${p.id}')">${com}</textarea>
         ${cd?`<div class="comment-meta">更新:${cd}</div>`:''}
-        <div class="comment-edit-wrap" id="ce-${p.id}">
-          <textarea id="cta-${p.id}">${com}</textarea>
-          <div class="comment-actions">
-            <button class="btn-save" onclick="saveComment('${p.id}')">保存</button>
-            <button class="btn-cancel" onclick="cancelComment('${p.id}')">取消</button>
-          </div>
-        </div>
       </td>
       <td class="col-hikitori">${p.hikitori||'—'}</td>
       <td class="col-gaichuu" id="gc-${p.id}">
-        <div class="gaichuu-disp ${gai?'':'empty'}" id="gd-${p.id}" onclick="editGaichuu('${p.id}')">${gai||'（未入力）'}</div>
-        ${gd?`<div class="comment-meta">更新:${gd} 🔒</div>`:'<div class="comment-meta" style="color:var(--accent2);opacity:.5;font-size:9px">🔒専用更新のみ</div>'}
-        <div class="gaichuu-edit-wrap" id="ge-${p.id}">
-          <textarea id="gta-${p.id}">${gai}</textarea>
-          <div class="gaichuu-actions">
-            <button class="btn-save-g" onclick="saveGaichuu('${p.id}')">保存</button>
-            <button class="btn-cancel" onclick="cancelGaichuu('${p.id}')">取消</button>
-          </div>
-        </div>
+        <textarea class="gaichuu-ta" id="gta-${p.id}"
+          onchange="saveGaichuu('${p.id}')"
+          onblur="saveGaichuu('${p.id}')">${gai}</textarea>
+        ${gd?`<div class="comment-meta">更新:${gd} 🔒</div>`:''}
       </td>
       <td class="col-eigyo">${p.eigyo||'—'}</td>
       <td class="col-sekkei">${p.sekkei||'—'}</td>`;
@@ -413,39 +439,33 @@ function toggleSeisaku(){
   btn.textContent=fSeisaku?'🙈 設計のみ工事を非表示中':'🙈 設計のみ工事を非表示';
   renderTable();
 }
-function setProg(id,sel){ progmarks[id]=sel.value; LSW('sc3_prog',progmarks); sel.className='prog-select '+progCls(sel.value); }
+function setProg(id,sel){ progmarks[id]=sel.value; LSW('sc3_prog',progmarks); sel.className='prog-select '+progCls(sel.value); pushGasData(id); }
 
 // ===== COMMENT =====
-function editComment(id){ document.getElementById(`cd-${id}`).style.display='none'; document.getElementById(`ce-${id}`).style.display='block'; document.getElementById(`cta-${id}`).focus(); }
-function cancelComment(id){ document.getElementById(`ce-${id}`).style.display='none'; document.getElementById(`cd-${id}`).style.display=''; }
 function saveComment(id){
-  const val=document.getElementById(`cta-${id}`).value.trim();
+  const el=document.getElementById(`cta-${id}`); if(!el) return;
+  const val=el.value.trim();
   comments[id]=val; const now=new Date();
   commentDates[id]=`${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   LSW('sc3_comments',comments); LSW('sc3_cdates',commentDates);
-  const d=document.getElementById(`cd-${id}`);
-  d.textContent=val||'クリックして入力…'; d.className=`comment-disp ${val?'':'empty'}`; d.style.display='';
-  document.getElementById(`ce-${id}`).style.display='none';
-  const cell=document.getElementById(`cc-${id}`);
-  let m=cell.querySelector('.comment-meta');
-  if(!m){ m=document.createElement('div'); m.className='comment-meta'; cell.insertBefore(m,cell.querySelector('.comment-edit-wrap')); }
-  m.textContent=`更新:${commentDates[id]}`; updateCounts(); showToast('コメントを保存しました');
+  pushGasData(id);
+  // meta更新
+  const ta=document.getElementById(`cta-${id}`);
+  if(ta){ let m=ta.nextElementSibling; if(!m||!m.classList.contains('comment-meta')){ m=document.createElement('div'); m.className='comment-meta'; ta.parentNode.insertBefore(m,ta.nextSibling); } m.textContent=`更新:${commentDates[id]}`; }
+  updateCounts(); showToast('コメントを保存しました');
 }
 
 // ===== GAICHUU =====
-function editGaichuu(id){ document.getElementById(`gd-${id}`).style.display='none'; document.getElementById(`ge-${id}`).style.display='block'; document.getElementById(`gta-${id}`).focus(); }
-function cancelGaichuu(id){ document.getElementById(`ge-${id}`).style.display='none'; document.getElementById(`gd-${id}`).style.display=''; }
 function saveGaichuu(id){
-  const val=document.getElementById(`gta-${id}`).value.trim();
+  const el=document.getElementById(`gta-${id}`); if(!el) return;
+  const val=el.value.trim();
   gaichuu[id]=val; const now=new Date();
   gaichuuDates[id]=`${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   LSW('sc3_gaichuu',gaichuu); LSW('sc3_gdates',gaichuuDates);
-  const d=document.getElementById(`gd-${id}`); d.textContent=val||'（未入力）'; d.className=`gaichuu-disp ${val?'':'empty'}`; d.style.display='';
-  document.getElementById(`ge-${id}`).style.display='none';
-  const cell=document.getElementById(`gc-${id}`);
-  let m=cell.querySelector('.comment-meta');
-  if(!m){ m=document.createElement('div'); m.className='comment-meta'; cell.insertBefore(m,cell.querySelector('.gaichuu-edit-wrap')); }
-  m.innerHTML=`更新:${gaichuuDates[id]} 🔒`; showToast('外注予定&決定を保存しました');
+  pushGasData(id);
+  const gta=document.getElementById(`gta-${id}`);
+  if(gta){ let m=gta.nextElementSibling; if(!m||!m.classList.contains('comment-meta')){ m=document.createElement('div'); m.className='comment-meta'; gta.parentNode.insertBefore(m,gta.nextSibling); } m.innerHTML=`更新:${gaichuuDates[id]} 🔒`; }
+  showToast('外注予定&決定を保存しました');
 }
 
 // ===== CP932デコーダ (Shift-JIS/CP932をブラウザで確実に読む) =====
@@ -635,6 +655,10 @@ function populateFilters(){
 }
 
 // ===== TOAST =====
+function showStatus(msg){
+  const el=document.getElementById('gas-status');
+  if(el) el.textContent=msg;
+}
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent='✓ '+msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
 
 // ===== DATE SORT (グローバル共通) =====
@@ -654,6 +678,19 @@ function sortByDate(arr){ arr.sort((a,b)=>dateToNum(a.chakushu)-dateToNum(b.chak
 if(!loadProjData()){ sortByDate(PROJ_DATA); }
 populateFilters();
 renderTable();
+
+// GASから最新の共有データを取得して再描画
+(async ()=>{
+  showStatus('共有データを読み込み中...');
+  const ok = await fetchGasData();
+  if(ok){
+    renderTable();
+    showStatus('');
+  } else {
+    showStatus('オフライン：ローカルデータを表示中');
+    setTimeout(()=>showStatus(''), 3000);
+  }
+})();
 
 // sticky オフセットを動的に計算（各エリアの実際の高さに合わせる）
 function updateStickyOffsets(){
