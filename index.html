@@ -282,53 +282,70 @@ const STORAGE_KEY_DATA = 'sc3_proj_data';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxllqdGpmTxFYVood80owBIv8BxA1uBxMVGqtolfsv4BEgBszHSH1KrnVs51cN0tGL9/exec';
 
 // ===== GAS通信 =====
-let gasData = {};  // GASから取得した共有データキャッシュ
+let gasData = {};
 
-// GASから全データを取得してローカルに反映
-function fetchGasData(){
+// ===== JSONP汎用関数 =====
+function jsonpFetch(url){
   return new Promise((resolve)=>{
-    // JSONP方式でCORSを回避（スマホ含む全端末対応）
-    const cbName = 'gasCallback_' + Date.now();
+    const cbName = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const script = document.createElement('script');
     let done = false;
-
-    window[cbName] = function(json){
-      done = true;
-      delete window[cbName];
-      script.remove();
-      try{
-        gasData = json;
-        Object.entries(json).forEach(([id, d])=>{
-          if(d.comment     !== undefined) comments[id]     = d.comment;
-          if(d.commentDate !== undefined) commentDates[id] = d.commentDate;
-          if(d.progress    !== undefined) progmarks[id]    = d.progress;
-          if(d.gaichuu     !== undefined) gaichuu[id]      = d.gaichuu;
-          if(d.gaichuuDate !== undefined) gaichuuDates[id] = d.gaichuuDate;
-        });
-        // 画面上のtextarea・selectに即時反映
-        Object.entries(json).forEach(([id, d])=>{
-          const cta = document.getElementById(`cta-${id}`);
-          if(cta && d.comment !== undefined) cta.value = d.comment;
-          const gta = document.getElementById(`gta-${id}`);
-          if(gta && d.gaichuu !== undefined) gta.value = d.gaichuu;
-          if(d.progress !== undefined){
-            progmarks[id] = d.progress;
-            const sel = document.querySelector(`#prog-${id}`);
-            if(sel){ sel.value = d.progress; sel.className = 'prog-select ' + progCls(d.progress); }
-          }
-        });
-        resolve(true);
-      }catch(e){ console.error('GASデータ処理失敗:', e); resolve(false); }
-    };
-
-    script.onerror = ()=>{ done=true; delete window[cbName]; script.remove(); resolve(false); };
-    setTimeout(()=>{ if(!done){ delete window[cbName]; script.remove(); resolve(false); } }, 8000);
-    script.src = GAS_URL + '?callback=' + cbName + '&t=' + Date.now();
+    window[cbName] = (data)=>{ done=true; delete window[cbName]; script.remove(); resolve(data); };
+    script.onerror = ()=>{ done=true; delete window[cbName]; script.remove(); resolve(null); };
+    setTimeout(()=>{ if(!done){ delete window[cbName]; script.remove(); resolve(null); } }, 10000);
+    script.src = url + (url.includes('?')?'&':'?') + 'callback=' + cbName + '&t=' + Date.now();
     document.head.appendChild(script);
   });
 }
 
-// GASに1件書き込む
+// GASからコメント・進捗・外注データを取得
+async function fetchGasData(){
+  const json = await jsonpFetch(GAS_URL + '?action=meta');
+  if(!json) return false;
+  gasData = json;
+  Object.entries(json).forEach(([id, d])=>{
+    if(d.comment     !== undefined) comments[id]     = d.comment;
+    if(d.commentDate !== undefined) commentDates[id] = d.commentDate;
+    if(d.progress    !== undefined) progmarks[id]    = d.progress;
+    if(d.gaichuu     !== undefined) gaichuu[id]      = d.gaichuu;
+    if(d.gaichuuDate !== undefined) gaichuuDates[id] = d.gaichuuDate;
+  });
+  // 画面上のtextarea・selectに即時反映
+  Object.entries(json).forEach(([id, d])=>{
+    const cta=document.getElementById(`cta-${id}`);
+    if(cta && d.comment!==undefined) cta.value=d.comment;
+    const gta=document.getElementById(`gta-${id}`);
+    if(gta && d.gaichuu!==undefined) gta.value=d.gaichuu;
+    if(d.progress!==undefined){
+      progmarks[id]=d.progress;
+      const sel=document.getElementById(`prog-${id}`);
+      if(sel){ sel.value=d.progress; sel.className='prog-select '+progCls(d.progress); }
+    }
+  });
+  return true;
+}
+
+// GASから工事データ本体を取得
+async function fetchProjDataFromGas(){
+  const arr = await jsonpFetch(GAS_URL + '?action=proj');
+  if(!arr || !Array.isArray(arr) || arr.length===0) return false;
+  PROJ_DATA = arr;
+  return true;
+}
+
+// GASに工事データ本体を保存（CSV更新時に呼ぶ）
+async function pushProjDataToGas(){
+  try{
+    await fetch(GAS_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'saveProjData', projData: PROJ_DATA})
+    });
+    return true;
+  }catch(e){ console.error('工事データ保存失敗:', e); return false; }
+}
+
+// GASに1件のメタデータを書き込む
 async function pushGasData(id){
   const payload = {
     id,
@@ -339,11 +356,9 @@ async function pushGasData(id){
     gaichuuDate: gaichuuDates[id]||''
   };
   try{
-    // no-corsで送信（スマホ含む全端末対応、レスポンスは取れないが書き込みは成功する）
     await fetch(GAS_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {'Content-Type': 'text/plain'},
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
       body: JSON.stringify(payload)
     });
   }catch(e){ console.error('GAS書込失敗:', e); }
@@ -671,6 +686,7 @@ function applyCSV(){
     populateFilters();
     renderTable();
     saveProjData();
+    pushProjDataToGas();
     showToast(`工事データを ${PROJ_DATA.length} 件に更新・保存しました`);
   }, 50);
 }
@@ -785,23 +801,31 @@ function sortByDate(arr){ arr.sort((a,b)=>dateToNum(a.chakushu)-dateToNum(b.chak
 
 // ===== INIT =====
 (()=>{ const n=new Date(),d=['日','月','火','水','木','金','土']; document.getElementById('current-date').textContent=`${n.getFullYear()}/${String(n.getMonth()+1).padStart(2,'0')}/${String(n.getDate()).padStart(2,'0')} (${d[n.getDay()]})`; })();
-// localStorageに保存済みデータがあれば復元、なければ埋め込み初期データをソートして使用
-if(!loadProjData()){ sortByDate(PROJ_DATA); }
 // 起動時は閲覧モード
 document.body.classList.add('view-mode');
-populateFilters();
-renderTable();
 
-// GASから最新の共有データを取得して再描画
+// GASから工事データ＋メタデータを取得して表示
 (async ()=>{
-  showStatus('共有データを読み込み中...');
-  const ok = await fetchGasData();
-  if(ok){
+  showStatus('データを読み込み中...');
+  // まずGASから工事データ本体を取得
+  const projOk = await fetchProjDataFromGas();
+  if(projOk){
+    sortByDate(PROJ_DATA);
+    saveProjData(); // localStorageにもキャッシュ
+  } else {
+    // GAS取得失敗時はlocalStorageかデフォルトデータを使用
+    if(!loadProjData()){ sortByDate(PROJ_DATA); }
+    showStatus('オフライン：前回データを表示中');
+    setTimeout(()=>showStatus(''), 3000);
+  }
+  populateFilters();
+  renderTable();
+
+  // 続いてコメント・進捗・外注データを取得して反映
+  const metaOk = await fetchGasData();
+  if(metaOk){
     renderTable();
     showStatus('');
-  } else {
-    showStatus('オフライン：ローカルデータを表示中');
-    setTimeout(()=>showStatus(''), 3000);
   }
 })();
 
