@@ -279,40 +279,53 @@ const LSW = (k,v) => localStorage.setItem(k, JSON.stringify(v));
 
 // 工事データをlocalStorageに保存・復元
 const STORAGE_KEY_DATA = 'sc3_proj_data';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbznYCY5tGtk62CFMlM4QMQxFuB9y4yxfK4KDCusUDpnSWdpxM5bwnEfXkijYyV4QBk7/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxllqdGpmTxFYVood80owBIv8BxA1uBxMVGqtolfsv4BEgBszHSH1KrnVs51cN0tGL9/exec';
 
 // ===== GAS通信 =====
 let gasData = {};  // GASから取得した共有データキャッシュ
 
 // GASから全データを取得してローカルに反映
-async function fetchGasData(){
-  try{
-    const res = await fetch(GAS_URL + '?t=' + Date.now());
-    const json = await res.json();
-    gasData = json;
-    // GASデータをローカル変数に反映
-    Object.entries(json).forEach(([id, d])=>{
-      if(d.comment    !== undefined) comments[id]     = d.comment;
-      if(d.commentDate!== undefined) commentDates[id] = d.commentDate;
-      if(d.progress   !== undefined) progmarks[id]    = d.progress;
-      if(d.gaichuu    !== undefined) gaichuu[id]      = d.gaichuu;
-      if(d.gaichuuDate!== undefined) gaichuuDates[id] = d.gaichuuDate;
-    });
-    // 画面上のtextareaにも即時反映
-    Object.entries(json).forEach(([id, d])=>{
-      const cta = document.getElementById(`cta-${id}`);
-      if(cta && d.comment !== undefined) cta.value = d.comment;
-      const gta = document.getElementById(`gta-${id}`);
-      if(gta && d.gaichuu !== undefined) gta.value = d.gaichuu;
-      const sel = document.querySelector(`select[onchange*="${id}"]`);
-      if(sel && d.progress !== undefined){
-        progmarks[id] = d.progress;
-        sel.value = d.progress;
-        sel.className = 'prog-select ' + progCls(d.progress);
-      }
-    });
-    return true;
-  }catch(e){ console.error('GAS取得失敗:', e); return false; }
+function fetchGasData(){
+  return new Promise((resolve)=>{
+    // JSONP方式でCORSを回避（スマホ含む全端末対応）
+    const cbName = 'gasCallback_' + Date.now();
+    const script = document.createElement('script');
+    let done = false;
+
+    window[cbName] = function(json){
+      done = true;
+      delete window[cbName];
+      script.remove();
+      try{
+        gasData = json;
+        Object.entries(json).forEach(([id, d])=>{
+          if(d.comment     !== undefined) comments[id]     = d.comment;
+          if(d.commentDate !== undefined) commentDates[id] = d.commentDate;
+          if(d.progress    !== undefined) progmarks[id]    = d.progress;
+          if(d.gaichuu     !== undefined) gaichuu[id]      = d.gaichuu;
+          if(d.gaichuuDate !== undefined) gaichuuDates[id] = d.gaichuuDate;
+        });
+        // 画面上のtextarea・selectに即時反映
+        Object.entries(json).forEach(([id, d])=>{
+          const cta = document.getElementById(`cta-${id}`);
+          if(cta && d.comment !== undefined) cta.value = d.comment;
+          const gta = document.getElementById(`gta-${id}`);
+          if(gta && d.gaichuu !== undefined) gta.value = d.gaichuu;
+          if(d.progress !== undefined){
+            progmarks[id] = d.progress;
+            const sel = document.querySelector(`#prog-${id}`);
+            if(sel){ sel.value = d.progress; sel.className = 'prog-select ' + progCls(d.progress); }
+          }
+        });
+        resolve(true);
+      }catch(e){ console.error('GASデータ処理失敗:', e); resolve(false); }
+    };
+
+    script.onerror = ()=>{ done=true; delete window[cbName]; script.remove(); resolve(false); };
+    setTimeout(()=>{ if(!done){ delete window[cbName]; script.remove(); resolve(false); } }, 8000);
+    script.src = GAS_URL + '?callback=' + cbName + '&t=' + Date.now();
+    document.head.appendChild(script);
+  });
 }
 
 // GASに1件書き込む
@@ -326,8 +339,11 @@ async function pushGasData(id){
     gaichuuDate: gaichuuDates[id]||''
   };
   try{
+    // no-corsで送信（スマホ含む全端末対応、レスポンスは取れないが書き込みは成功する）
     await fetch(GAS_URL, {
-      method:'POST',
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {'Content-Type': 'text/plain'},
       body: JSON.stringify(payload)
     });
   }catch(e){ console.error('GAS書込失敗:', e); }
@@ -445,7 +461,7 @@ function renderTable(){
       <td class="col-buhin">${p.buhinmei}</td>
       <td class="col-chakushu"><span class="date-cell ${dateCls(p.chakushu)}">${fmtDate(p.chakushu)}</span></td>
       <td class="col-progress" style="text-align:center">
-        <select class="prog-select ${progCls(prg)}" onchange="setProg('${p.id}',this)">
+        <select id="prog-${p.id}" class="prog-select ${progCls(prg)}" onchange="setProg('${p.id}',this)">
           <option value=""  ${prg===''  ?'selected':''}></option>
           <option value="○" ${prg==='○' ?'selected':''}>○</option>
           <option value="△" ${prg==='△' ?'selected':''}>△</option>
