@@ -126,6 +126,46 @@ td{padding:8px 8px;vertical-align:middle}
   white-space:nowrap;
   background:var(--surface2);
 }
+
+/* ===== 編集モード切替 ===== */
+.mode-badge{
+  font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;
+  border:1.5px solid;cursor:pointer;transition:all .2s;white-space:nowrap;
+}
+.mode-badge.view-mode{
+  background:rgba(156,142,122,.12);color:var(--muted);border-color:var(--border);
+}
+.mode-badge.edit-mode{
+  background:rgba(192,57,43,.12);color:var(--danger);border-color:var(--danger);
+}
+
+/* 閲覧モード時：textarea・selectを読み取り専用風に */
+body.view-mode .comment-ta,
+body.view-mode .gaichuu-ta{
+  pointer-events:auto;
+  background:transparent;
+  border-color:transparent;
+  resize:none;
+  cursor:default;
+  color:var(--text);
+  overflow-y:auto;
+  user-select:text;
+  -webkit-user-select:text;
+}
+body.view-mode .prog-select{
+  pointer-events:none;
+  background:transparent;
+  border-color:transparent;
+  cursor:default;
+  -webkit-appearance:none;
+  appearance:none;
+}
+/* 閲覧モード時：CSV更新・外注ボタンを非表示 */
+body.view-mode .btn-csv,
+body.view-mode .btn-gaichuu,
+body.view-mode .btn-seisaku{
+  display:none;
+}
 </style>
 </head>
 <body>
@@ -133,6 +173,7 @@ td{padding:8px 8px;vertical-align:middle}
   <div class="logo"><div class="logo-icon">⚙</div>設計進捗管理システム</div>
   <span id="current-date" class="date-badge"></span>
 <span id="gas-status" style="font-size:10px;color:var(--muted);margin-left:8px"></span>
+<button class="mode-badge view-mode" id="mode-btn" onclick="toggleMode()" title="クリックで編集モードに切替">👁 閲覧モード</button>
 </header>
 <div class="summary-bar">
   <div class="summary-card c-all active" data-filter="all"><div class="num" id="cnt-all">0</div><div class="lbl">全工事</div></div>
@@ -256,6 +297,19 @@ async function fetchGasData(){
       if(d.progress   !== undefined) progmarks[id]    = d.progress;
       if(d.gaichuu    !== undefined) gaichuu[id]      = d.gaichuu;
       if(d.gaichuuDate!== undefined) gaichuuDates[id] = d.gaichuuDate;
+    });
+    // 画面上のtextareaにも即時反映
+    Object.entries(json).forEach(([id, d])=>{
+      const cta = document.getElementById(`cta-${id}`);
+      if(cta && d.comment !== undefined) cta.value = d.comment;
+      const gta = document.getElementById(`gta-${id}`);
+      if(gta && d.gaichuu !== undefined) gta.value = d.gaichuu;
+      const sel = document.querySelector(`select[onchange*="${id}"]`);
+      if(sel && d.progress !== undefined){
+        progmarks[id] = d.progress;
+        sel.value = d.progress;
+        sel.className = 'prog-select ' + progCls(d.progress);
+      }
     });
     return true;
   }catch(e){ console.error('GAS取得失敗:', e); return false; }
@@ -417,7 +471,7 @@ function renderTable(){
     tbody.appendChild(tr);
   });
   updateCounts();
-  setTimeout(()=>{ updateStickyOffsets(); syncFixedHeader(); }, 0);
+  setTimeout(()=>{ updateStickyOffsets(); syncFixedHeader(); restoreAllTaSizes(); }, 50);
 }
 function updateCounts(){
   const base=PROJ_DATA.filter(p=>{
@@ -439,10 +493,11 @@ function toggleSeisaku(){
   btn.textContent=fSeisaku?'🙈 設計のみ工事を非表示中':'🙈 設計のみ工事を非表示';
   renderTable();
 }
-function setProg(id,sel){ progmarks[id]=sel.value; LSW('sc3_prog',progmarks); sel.className='prog-select '+progCls(sel.value); pushGasData(id); }
+function setProg(id,sel){ if(!isEditMode){ sel.value=progmarks[id]||''; return; } progmarks[id]=sel.value; LSW('sc3_prog',progmarks); sel.className='prog-select '+progCls(sel.value); pushGasData(id); }
 
 // ===== COMMENT =====
 function saveComment(id){
+  if(!isEditMode) return;  // 閲覧モード時は保存しない
   const el=document.getElementById(`cta-${id}`); if(!el) return;
   const val=el.value.trim();
   comments[id]=val; const now=new Date();
@@ -457,6 +512,7 @@ function saveComment(id){
 
 // ===== GAICHUU =====
 function saveGaichuu(id){
+  if(!isEditMode) return;  // 閲覧モード時は保存しない
   const el=document.getElementById(`gta-${id}`); if(!el) return;
   const val=el.value.trim();
   gaichuu[id]=val; const now=new Date();
@@ -655,6 +711,45 @@ function populateFilters(){
 }
 
 // ===== TOAST =====
+// ===== textareaサイズ保存・復元 =====
+function saveTaSize(id, type){
+  const el = document.getElementById(`${type}-${id}`);
+  if(!el) return;
+  // offsetHeight で確実に現在の高さを取得
+  const h = el.offsetHeight;
+  if(h > 0) localStorage.setItem(`sc3_tasize_${type}_${id}`, h + 'px');
+}
+function restoreAllTaSizes(){
+  document.querySelectorAll('.comment-ta').forEach(el=>{
+    const id = el.id.replace('cta-','');
+    const saved = localStorage.getItem(`sc3_tasize_cta_${id}`);
+    if(saved) el.style.height = saved;
+  });
+  document.querySelectorAll('.gaichuu-ta').forEach(el=>{
+    const id = el.id.replace('gta-','');
+    const saved = localStorage.getItem(`sc3_tasize_gta_${id}`);
+    if(saved) el.style.height = saved;
+  });
+}
+
+// ===== 編集モード切替 =====
+let isEditMode = false;
+function toggleMode(){
+  isEditMode = !isEditMode;
+  const btn = document.getElementById('mode-btn');
+  if(isEditMode){
+    document.body.classList.remove('view-mode');
+    document.body.classList.add('edit-mode');
+    btn.className = 'mode-badge edit-mode';
+    btn.textContent = '✏️ 編集モード';
+  } else {
+    document.body.classList.remove('edit-mode');
+    document.body.classList.add('view-mode');
+    btn.className = 'mode-badge view-mode';
+    btn.textContent = '👁 閲覧モード';
+  }
+}
+
 function showStatus(msg){
   const el=document.getElementById('gas-status');
   if(el) el.textContent=msg;
@@ -676,6 +771,8 @@ function sortByDate(arr){ arr.sort((a,b)=>dateToNum(a.chakushu)-dateToNum(b.chak
 (()=>{ const n=new Date(),d=['日','月','火','水','木','金','土']; document.getElementById('current-date').textContent=`${n.getFullYear()}/${String(n.getMonth()+1).padStart(2,'0')}/${String(n.getDate()).padStart(2,'0')} (${d[n.getDay()]})`; })();
 // localStorageに保存済みデータがあれば復元、なければ埋め込み初期データをソートして使用
 if(!loadProjData()){ sortByDate(PROJ_DATA); }
+// 起動時は閲覧モード
+document.body.classList.add('view-mode');
 populateFilters();
 renderTable();
 
@@ -740,6 +837,19 @@ function syncFixedHeader(){
 
 // 横スクロール・リサイズ対応
 window.addEventListener('resize', ()=>{ updateStickyOffsets(); syncFixedHeader(); });
+// resizeドラッグ終了時にサイズを全textarea対象で保存
+window.addEventListener('mouseup', ()=>{
+  document.querySelectorAll('.comment-ta').forEach(el=>{
+    const id = el.id.replace('cta-','');
+    const h = el.offsetHeight;
+    if(h > 0) localStorage.setItem(`sc3_tasize_cta_${id}`, h + 'px');
+  });
+  document.querySelectorAll('.gaichuu-ta').forEach(el=>{
+    const id = el.id.replace('gta-','');
+    const h = el.offsetHeight;
+    if(h > 0) localStorage.setItem(`sc3_tasize_gta_${id}`, h + 'px');
+  });
+});
 [0, 200, 500].forEach(ms => setTimeout(()=>{
   updateStickyOffsets();
   syncFixedHeader();
