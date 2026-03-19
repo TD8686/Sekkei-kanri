@@ -160,11 +160,12 @@ body.view-mode .prog-select{
   -webkit-appearance:none;
   appearance:none;
 }
-/* 閲覧モード時：CSV更新・外注ボタンを非表示 */
+/* 閲覧モード時：CSV更新・外注ボタンは無効化（非表示にしないでレイアウト維持） */
 body.view-mode .btn-csv,
-body.view-mode .btn-gaichuu,
-body.view-mode .btn-seisaku{
-  display:none;
+body.view-mode .btn-gaichuu{
+  opacity:0.3;
+  pointer-events:none;
+  cursor:not-allowed;
 }
 </style>
 </head>
@@ -173,7 +174,6 @@ body.view-mode .btn-seisaku{
   <div class="logo"><div class="logo-icon">⚙</div>設計進捗管理システム</div>
   <span id="current-date" class="date-badge"></span>
 <span id="gas-status" style="font-size:10px;color:var(--muted);margin-left:8px"></span>
-<button class="mode-badge view-mode" id="mode-btn" onclick="toggleMode()" title="クリックで編集モードに切替">👁 閲覧モード</button>
 </header>
 <div class="summary-bar">
   <div class="summary-card c-all active" data-filter="all"><div class="num" id="cnt-all">0</div><div class="lbl">全工事</div></div>
@@ -182,6 +182,7 @@ body.view-mode .btn-seisaku{
   <div class="summary-card c-commented" data-filter="commented"><div class="num" id="cnt-commented">0</div><div class="lbl">📝 コメントあり</div></div>
 </div>
 <div class="toolbar">
+  <button class="mode-badge view-mode" id="mode-btn" onclick="toggleMode()" title="クリックで編集モードに切替">👁 閲覧</button>
   <div class="search-box"><span style="color:var(--muted)">🔍</span><input type="text" id="search-input" placeholder="工事番号・部品名・略称・P/J・担当者で検索..."></div>
   <select class="fs" id="sekkei-filter"><option value="">設計担当：全員</option></select>
   <select class="fs" id="eigyo-filter"><option value="">営業担当：全員</option></select>
@@ -335,12 +336,23 @@ async function fetchProjDataFromGas(){
 
 // GASに工事データ本体を保存（CSV更新時に呼ぶ）
 async function pushProjDataToGas(){
+  // JSONP GET方式で送信（no-cors POSTはbodyが届かないため）
   try{
-    await fetch(GAS_URL, {
-      method:'POST', mode:'no-cors',
-      headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({action:'saveProjData', projData: PROJ_DATA})
-    });
+    const CHUNK = 20; // URLの長さ制限対策で小さめに分割
+    for(let i=0; i<PROJ_DATA.length; i+=CHUNK){
+      const chunk = PROJ_DATA.slice(i, i+CHUNK);
+      const isFirst = i===0 ? '1' : '0';
+      const rowsEnc = encodeURIComponent(JSON.stringify(chunk));
+      const url = GAS_URL
+        + '?action=saveProj'
+        + '&idx='   + i
+        + '&total=' + PROJ_DATA.length
+        + '&first=' + isFirst
+        + '&rows='  + rowsEnc;
+      const result = await jsonpFetch(url);
+      if(!result){ console.error('工事データ送信失敗 idx:', i); return false; }
+    }
+    console.log('工事データ送信完了:', PROJ_DATA.length, '件');
     return true;
   }catch(e){ console.error('工事データ保存失敗:', e); return false; }
 }
@@ -356,11 +368,9 @@ async function pushGasData(id){
     gaichuuDate: gaichuuDates[id]||''
   };
   try{
-    await fetch(GAS_URL, {
-      method:'POST', mode:'no-cors',
-      headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify(payload)
-    });
+    const dataEnc = encodeURIComponent(JSON.stringify(payload));
+    const url = GAS_URL + '?action=saveMeta&data=' + dataEnc;
+    await jsonpFetch(url);
   }catch(e){ console.error('GAS書込失敗:', e); }
 }
 function saveProjData(){
