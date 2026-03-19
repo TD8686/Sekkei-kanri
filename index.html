@@ -694,16 +694,14 @@ function previewCSV(input){
 function applyCSV(){
   if(!pendingCSV) return;
   PROJ_DATA=sortByDate(pendingCSV); pendingCSV=null;
-  // モーダルを先に確実に閉じてからDOM更新
   const modalEl = document.getElementById('modal-csv');
   if(modalEl) modalEl.classList.remove('open');
-  // ファイル入力をリセット（同じファイル再選択を可能に）
   const fi = document.getElementById('csv-file');
   if(fi) fi.value='';
   document.getElementById('btn-csv-apply').disabled=true;
   document.getElementById('csv-preview').textContent='';
   document.getElementById('csv-preview').className='modal-preview';
-  setTimeout(()=>{
+  setTimeout(async ()=>{
     populateFilters();
     renderTable();
     saveProjData();
