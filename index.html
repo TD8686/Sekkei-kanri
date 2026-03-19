@@ -336,25 +336,36 @@ async function fetchProjDataFromGas(){
 
 // GASに工事データ本体を保存（CSV更新時に呼ぶ）
 async function pushProjDataToGas(){
-  // JSONP GET方式で送信（no-cors POSTはbodyが届かないため）
   try{
-    const CHUNK = 20; // URLの長さ制限対策で小さめに分割
-    for(let i=0; i<PROJ_DATA.length; i+=CHUNK){
+    const CHUNK = 10; // 小さく分割してURL長さ制限を回避
+    const total = PROJ_DATA.length;
+    showStatus(`GASに送信中... 0/${total}件`);
+    for(let i=0; i<total; i+=CHUNK){
       const chunk = PROJ_DATA.slice(i, i+CHUNK);
-      const isFirst = i===0 ? '1' : '0';
+      const isFirst = (i===0) ? '1' : '0';
       const rowsEnc = encodeURIComponent(JSON.stringify(chunk));
       const url = GAS_URL
         + '?action=saveProj'
         + '&idx='   + i
-        + '&total=' + PROJ_DATA.length
+        + '&total=' + total
         + '&first=' + isFirst
         + '&rows='  + rowsEnc;
       const result = await jsonpFetch(url);
-      if(!result){ console.error('工事データ送信失敗 idx:', i); return false; }
+      if(!result || !result.ok){
+        showStatus('GAS送信失敗 idx:' + i);
+        console.error('GAS送信失敗:', i, result);
+        return false;
+      }
+      showStatus(`GASに送信中... ${Math.min(i+CHUNK,total)}/${total}件`);
     }
-    console.log('工事データ送信完了:', PROJ_DATA.length, '件');
+    showStatus('');
+    console.log('工事データ送信完了:', total, '件');
     return true;
-  }catch(e){ console.error('工事データ保存失敗:', e); return false; }
+  }catch(e){
+    showStatus('GAS送信エラー: ' + e.message);
+    console.error('工事データ保存失敗:', e);
+    return false;
+  }
 }
 
 // GASに1件のメタデータを書き込む
@@ -696,8 +707,13 @@ function applyCSV(){
     populateFilters();
     renderTable();
     saveProjData();
-    pushProjDataToGas();
-    showToast(`工事データを ${PROJ_DATA.length} 件に更新・保存しました`);
+    showToast(`工事データを ${PROJ_DATA.length} 件に更新しました。GASに送信中...`);
+    const gasOk = await pushProjDataToGas();
+    if(gasOk){
+      showToast(`✓ ${PROJ_DATA.length} 件をGASに保存しました`);
+    } else {
+      showToast(`⚠ GAS保存に失敗しました。localStorageには保存済みです`);
+    }
   }, 50);
 }
 
@@ -817,26 +833,25 @@ document.body.classList.add('view-mode');
 // GASから工事データ＋メタデータを取得して表示
 (async ()=>{
   showStatus('データを読み込み中...');
-  // まずGASから工事データ本体を取得
-  const projOk = await fetchProjDataFromGas();
-  if(projOk){
-    sortByDate(PROJ_DATA);
-    saveProjData(); // localStorageにもキャッシュ
-  } else {
-    // GAS取得失敗時はlocalStorageかデフォルトデータを使用
-    if(!loadProjData()){ sortByDate(PROJ_DATA); }
-    showStatus('オフライン：前回データを表示中');
-    setTimeout(()=>showStatus(''), 3000);
-  }
+  // まずlocalStorageから工事データを復元して即表示
+  if(!loadProjData()){ sortByDate(PROJ_DATA); }
   populateFilters();
   renderTable();
 
-  // 続いてコメント・進捗・外注データを取得して反映
-  const metaOk = await fetchGasData();
-  if(metaOk){
+  // GASから最新工事データを取得して上書き
+  showStatus('データを読み込み中...');
+  const projOk = await fetchProjDataFromGas();
+  if(projOk && PROJ_DATA.length > 0){
+    sortByDate(PROJ_DATA);
+    saveProjData();
+    populateFilters();
     renderTable();
-    showStatus('');
   }
+
+  // コメント・進捗・外注データを取得して反映
+  const metaOk = await fetchGasData();
+  if(metaOk){ renderTable(); }
+  showStatus('');
 })();
 
 // sticky オフセットを動的に計算（各エリアの実際の高さに合わせる）
