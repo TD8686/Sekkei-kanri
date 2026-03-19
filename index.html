@@ -335,27 +335,56 @@ async function fetchProjDataFromGas(){
 }
 
 // GASに工事データ本体を保存（CSV更新時に呼ぶ）
+// フォーム送信（hidden iframe）でGASにPOST — CORSを完全回避
+function gasFormPost(params){
+  return new Promise((resolve)=>{
+    const iframeId = 'gas_iframe_' + Date.now();
+    const formId   = 'gas_form_'   + Date.now();
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeId;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = GAS_URL;
+    form.target = iframeId;
+    form.style.display = 'none';
+
+    // パラメータをhidden inputとして追加
+    Object.entries(params).forEach(([k,v])=>{
+      const input = document.createElement('input');
+      input.type  = 'hidden';
+      input.name  = k;
+      input.value = typeof v === 'object' ? JSON.stringify(v) : String(v);
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    iframe.onload = ()=>{
+      setTimeout(()=>{ iframe.remove(); form.remove(); }, 500);
+      resolve(true);
+    };
+    setTimeout(()=>{ iframe.remove(); form.remove(); resolve(true); }, 5000);
+    form.submit();
+  });
+}
+
 async function pushProjDataToGas(){
   try{
     const total = PROJ_DATA.length;
     showStatus(`GASに送信中... 0/${total}件`);
-
-    // まず最初の1件でシートを初期化
-    for(let i=0; i<total; i++){
-      const isFirst = (i===0) ? '1' : '0';
-      const rowEnc = encodeURIComponent(JSON.stringify([PROJ_DATA[i]]));
-      const url = GAS_URL
-        + '?action=saveProj'
-        + '&idx='   + i
-        + '&first=' + isFirst
-        + '&rows='  + rowEnc;
-      const result = await jsonpFetch(url);
-      if(!result || !result.ok){
-        console.error('GAS送信失敗 idx:', i, result);
-        showStatus('GAS送信失敗 ' + (i+1) + '件目');
-        return false;
-      }
-      if(i % 5 === 0) showStatus(`GASに送信中... ${i+1}/${total}件`);
+    const CHUNK = 5;
+    for(let i=0; i<total; i+=CHUNK){
+      const chunk   = PROJ_DATA.slice(i, i+CHUNK);
+      const isFirst = (i===0);
+      await gasFormPost({
+        action:  'saveProj',
+        idx:     String(i),
+        first:   isFirst ? '1' : '0',
+        rows:    JSON.stringify(chunk)
+      });
+      showStatus(`GASに送信中... ${Math.min(i+CHUNK,total)}/${total}件`);
     }
     showStatus('');
     console.log('工事データ送信完了:', total, '件');
@@ -378,9 +407,7 @@ async function pushGasData(id){
     gaichuuDate: gaichuuDates[id]||''
   };
   try{
-    const dataEnc = encodeURIComponent(JSON.stringify(payload));
-    const url = GAS_URL + '?action=saveMeta&data=' + dataEnc;
-    await jsonpFetch(url);
+    await gasFormPost({action:'saveMeta', data: JSON.stringify(payload)});
   }catch(e){ console.error('GAS書込失敗:', e); }
 }
 function saveProjData(){
