@@ -337,26 +337,25 @@ async function fetchProjDataFromGas(){
 // GASに工事データ本体を保存（CSV更新時に呼ぶ）
 async function pushProjDataToGas(){
   try{
-    const CHUNK = 10; // 小さく分割してURL長さ制限を回避
     const total = PROJ_DATA.length;
     showStatus(`GASに送信中... 0/${total}件`);
-    for(let i=0; i<total; i+=CHUNK){
-      const chunk = PROJ_DATA.slice(i, i+CHUNK);
+
+    // まず最初の1件でシートを初期化
+    for(let i=0; i<total; i++){
       const isFirst = (i===0) ? '1' : '0';
-      const rowsEnc = encodeURIComponent(JSON.stringify(chunk));
+      const rowEnc = encodeURIComponent(JSON.stringify([PROJ_DATA[i]]));
       const url = GAS_URL
         + '?action=saveProj'
         + '&idx='   + i
-        + '&total=' + total
         + '&first=' + isFirst
-        + '&rows='  + rowsEnc;
+        + '&rows='  + rowEnc;
       const result = await jsonpFetch(url);
       if(!result || !result.ok){
-        showStatus('GAS送信失敗 idx:' + i);
-        console.error('GAS送信失敗:', i, result);
+        console.error('GAS送信失敗 idx:', i, result);
+        showStatus('GAS送信失敗 ' + (i+1) + '件目');
         return false;
       }
-      showStatus(`GASに送信中... ${Math.min(i+CHUNK,total)}/${total}件`);
+      if(i % 5 === 0) showStatus(`GASに送信中... ${i+1}/${total}件`);
     }
     showStatus('');
     console.log('工事データ送信完了:', total, '件');
