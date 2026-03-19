@@ -398,18 +398,19 @@ async function gasWrite(params){
     encodeURIComponent(k) + '=' + encodeURIComponent(typeof v==='object'?JSON.stringify(v):String(v))
   ).join('&');
   const url = GAS_URL + '?' + qs;
+  console.log('gasWrite URL:', url.slice(0,120));
   try{
     const res = await fetch(url, {redirect:'follow'});
     const text = await res.text();
-    // JSONとして解析を試みる
+    console.log('gasWrite レスポンス:', text.slice(0,100));
     try{ return JSON.parse(text); }catch(e){ return {ok:true}; }
   }catch(e){
-    // fetchが失敗した場合はJSONPにフォールバック
+    console.warn('gasWrite fetch失敗→JSONP:', e.message);
     try{
       const result = await jsonpFetch(url);
       return result || {ok:true};
     }catch(e2){
-      console.error('gasWrite失敗:', e2);
+      console.error('gasWrite完全失敗:', e2);
       return null;
     }
   }
@@ -452,7 +453,9 @@ async function pushGasData(id){
     gaichuuDate: gaichuuDates[id]||''
   };
   try{
-    await gasWrite({action:'saveMeta', data: JSON.stringify(payload)});
+    console.log('pushGasData送信:', id, payload);
+    const result = await gasWrite({action:'saveMeta', data: JSON.stringify(payload)});
+    console.log('pushGasData結果:', id, result);
   }catch(e){ console.error('GAS書込失敗:', e); }
 }
 function saveProjData(){
