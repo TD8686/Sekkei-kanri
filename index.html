@@ -300,9 +300,24 @@ function jsonpFetch(url){
 }
 
 // GASからコメント・進捗・外注データを取得
+async function gasRead(url){
+  // まずfetch redirect:followで試みる
+  try{
+    const res = await fetch(url, {redirect:'follow'});
+    const text = await res.text();
+    // JSONP形式の場合はコールバック部分を除去
+    const clean = text.replace(/^[^(]+\(/, '').replace(/\)\s*$/, '');
+    return JSON.parse(clean);
+  }catch(e){
+    // フォールバック：JSONP
+    try{ return await jsonpFetch(url); }
+    catch(e2){ return null; }
+  }
+}
+
 async function fetchGasData(){
-  const json = await jsonpFetch(GAS_URL + '?action=meta');
-  if(!json) return false;
+  const json = await gasRead(GAS_URL + '?action=meta&t=' + Date.now());
+  if(!json || typeof json !== 'object' || Array.isArray(json)) return false;
   gasData = json;
   Object.entries(json).forEach(([id, d])=>{
     if(d.comment     !== undefined) comments[id]     = d.comment;
@@ -348,7 +363,7 @@ function normDate(s){
 // GASから工事データ本体を取得
 async function fetchProjDataFromGas(){
   try{
-    const arr = await jsonpFetch(GAS_URL + '?action=proj');
+    const arr = await gasRead(GAS_URL + '?action=proj&t=' + Date.now());
     // GASが空または失敗した場合はfalseを返してlocalStorageを使う
     if(!arr || !Array.isArray(arr) || arr.length === 0){
       console.log('GASから工事データなし→localStorageを使用');
