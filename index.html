@@ -359,39 +359,23 @@ async function fetchProjDataFromGas(){
 }
 
 // GASに工事データ本体を保存（CSV更新時に呼ぶ）
-// フォーム送信（hidden iframe）でGASにPOST — CORSを完全回避
-function gasFormPost(params){
-  return new Promise((resolve)=>{
-    const iframeId = 'gas_iframe_' + Date.now();
-    const formId   = 'gas_form_'   + Date.now();
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeId;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = GAS_URL;
-    form.target = iframeId;
-    form.style.display = 'none';
-
-    // パラメータをhidden inputとして追加
-    Object.entries(params).forEach(([k,v])=>{
-      const input = document.createElement('input');
-      input.type  = 'hidden';
-      input.name  = k;
-      input.value = typeof v === 'object' ? JSON.stringify(v) : String(v);
-      form.appendChild(input);
-    });
-
-    document.body.appendChild(form);
-    iframe.onload = ()=>{
-      setTimeout(()=>{ iframe.remove(); form.remove(); }, 500);
-      resolve(true);
-    };
-    setTimeout(()=>{ iframe.remove(); form.remove(); resolve(true); }, 5000);
-    form.submit();
-  });
+// GASへの送信：URLパラメータ付きGETをfetchで実行（no-corsではなく通常fetch）
+// GASはリダイレクト後のURLでパラメータを処理するためfollowが必要
+async function gasFormPost(params){
+  // URLパラメータとして構築
+  const qs = Object.entries(params).map(([k,v])=>
+    encodeURIComponent(k) + '=' + encodeURIComponent(typeof v==='object'?JSON.stringify(v):String(v))
+  ).join('&');
+  const url = GAS_URL + '?' + qs;
+  try{
+    // GASはGETリクエストでもdoPostではなくdoGetで処理される
+    // → doGetにsaveProj/saveMetaの処理を追加してGETで受け取る
+    const result = await jsonpFetch(url);
+    return result || {ok:true};
+  }catch(e){
+    console.error('gasFormPost失敗:', e);
+    return null;
+  }
 }
 
 async function pushProjDataToGas(){
