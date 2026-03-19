@@ -355,10 +355,10 @@ async function fetchGasData(){
   gasData = json;
   Object.entries(json).forEach(([id, d])=>{
     if(d.comment     !== undefined) comments[id]     = d.comment;
-    if(d.commentDate !== undefined) commentDates[id] = d.commentDate;
+    if(d.commentDate !== undefined) commentDates[id] = normMetaDate(d.commentDate);
     if(d.progress    !== undefined) progmarks[id]    = d.progress;
     if(d.gaichuu     !== undefined) gaichuu[id]      = d.gaichuu;
-    if(d.gaichuuDate !== undefined) gaichuuDates[id] = d.gaichuuDate;
+    if(d.gaichuuDate !== undefined) gaichuuDates[id] = normMetaDate(d.gaichuuDate);
   });
   // 画面上のtextarea・selectに即時反映
   Object.entries(json).forEach(([id, d])=>{
@@ -373,6 +373,28 @@ async function fetchGasData(){
     }
   });
   return true;
+}
+
+// コメント更新日を読みやすい形式に正規化
+// "Thu Mar 19 2026 20:45:00 GMT+0900" → "2026/03/19 20:45"
+function normMetaDate(s){
+  if(!s) return '';
+  // すでに "YYYY/MM/DD HH:MM" 形式
+  if(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/.test(s)) return s;
+  // "M/D HH:MM" 形式（旧形式）
+  if(/^\d{1,2}\/\d{1,2} \d{2}:\d{2}$/.test(s)) return s;
+  // Date.toString()形式 → パースして整形
+  try{
+    const d = new Date(s);
+    if(!isNaN(d.getTime())){
+      return d.getFullYear() + '/' +
+             String(d.getMonth()+1).padStart(2,'0') + '/' +
+             String(d.getDate()).padStart(2,'0') + ' ' +
+             String(d.getHours()).padStart(2,'0') + ':' +
+             String(d.getMinutes()).padStart(2,'0');
+    }
+  }catch(e){}
+  return s;
 }
 
 // 日付文字列を YYYY/MM/DD 形式に正規化
