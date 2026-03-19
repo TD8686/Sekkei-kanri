@@ -338,6 +338,7 @@ async function fetchGasData(){
       if(sel){ sel.value=d.progress; sel.className='prog-select '+progCls(d.progress); }
     }
   });
+  console.log('fetchGasData完了: metaデータ件数=', Object.keys(json).length);
   return true;
 }
 
@@ -619,15 +620,17 @@ function toggleSeisaku(){
   btn.textContent=fSeisaku?'🙈 設計のみ工事を非表示中':'🙈 設計のみ工事を非表示';
   renderTable();
 }
-function setProg(id,sel){ if(!isEditMode){ sel.value=progmarks[id]||''; return; } progmarks[id]=sel.value; LSW('sc3_prog',progmarks); sel.className='prog-select '+progCls(sel.value); pushGasData(id); }
+function setProg(id,sel){ console.log('setProg id=',id,'isEditMode=',isEditMode,'val=',sel.value); if(!isEditMode){ sel.value=progmarks[id]||''; return; } progmarks[id]=sel.value; LSW('sc3_prog',progmarks); sel.className='prog-select '+progCls(sel.value); pushGasData(id); }
 
 // ===== COMMENT =====
 function saveComment(id){
+  console.log('saveComment呼び出し id=', id, 'isEditMode=', isEditMode);
   if(!isEditMode) return;  // 閲覧モード時は保存しない
   const el=document.getElementById(`cta-${id}`); if(!el) return;
   const val=el.value.trim();
   comments[id]=val; const now=new Date();
-  commentDates[id]=`${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  // YYYY/MM/DD HH:MM 形式で統一保存
+  commentDates[id]=`${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   LSW('sc3_comments',comments); LSW('sc3_cdates',commentDates);
   pushGasData(id);
   // meta更新
@@ -866,6 +869,7 @@ function restoreAllTaSizes(){
 let isEditMode = false;
 function toggleMode(){
   isEditMode = !isEditMode;
+  console.log('モード切替: isEditMode=', isEditMode);
   const btn = document.getElementById('mode-btn');
   if(isEditMode){
     document.body.classList.remove('view-mode');
