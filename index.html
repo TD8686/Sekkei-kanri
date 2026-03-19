@@ -347,34 +347,56 @@ function normDate(s){
 
 // GASから工事データ本体を取得
 async function fetchProjDataFromGas(){
-  const arr = await jsonpFetch(GAS_URL + '?action=proj');
-  if(!arr || !Array.isArray(arr) || arr.length===0) return false;
-  // 日付フィールドを正規化
-  PROJ_DATA = arr.map(p=>({
-    ...p,
-    chakushu: normDate(p.chakushu),
-    nouki:    normDate(p.nouki)
-  }));
-  return true;
+  try{
+    const arr = await jsonpFetch(GAS_URL + '?action=proj');
+    // GASが空または失敗した場合はfalseを返してlocalStorageを使う
+    if(!arr || !Array.isArray(arr) || arr.length === 0){
+      console.log('GASから工事データなし→localStorageを使用');
+      return false;
+    }
+    // 日付フィールドを正規化
+    const normalized = arr.map(p=>({
+      ...p,
+      chakushu: normDate(p.chakushu),
+      nouki:    normDate(p.nouki)
+    }));
+    // 正規化後も有効なデータがあるか確認
+    const valid = normalized.filter(p=>p.id && p.chakushu);
+    if(valid.length === 0){
+      console.log('GAS工事データが無効→localStorageを使用');
+      return false;
+    }
+    PROJ_DATA = normalized;
+    console.log('GASから工事データ取得:', PROJ_DATA.length, '件');
+    return true;
+  }catch(e){
+    console.error('fetchProjDataFromGas失敗:', e);
+    return false;
+  }
 }
 
 // GASに工事データ本体を保存（CSV更新時に呼ぶ）
-// GASへの送信：URLパラメータ付きGETをfetchで実行（no-corsではなく通常fetch）
-// GASはリダイレクト後のURLでパラメータを処理するためfollowが必要
-async function gasFormPost(params){
-  // URLパラメータとして構築
+// GASへの書き込み：fetch + mode:cors でGETリクエスト
+// GASのdoGetでsaveProj/saveMetaを処理する
+async function gasWrite(params){
   const qs = Object.entries(params).map(([k,v])=>
     encodeURIComponent(k) + '=' + encodeURIComponent(typeof v==='object'?JSON.stringify(v):String(v))
   ).join('&');
   const url = GAS_URL + '?' + qs;
   try{
-    // GASはGETリクエストでもdoPostではなくdoGetで処理される
-    // → doGetにsaveProj/saveMetaの処理を追加してGETで受け取る
-    const result = await jsonpFetch(url);
-    return result || {ok:true};
+    const res = await fetch(url, {redirect:'follow'});
+    const text = await res.text();
+    // JSONとして解析を試みる
+    try{ return JSON.parse(text); }catch(e){ return {ok:true}; }
   }catch(e){
-    console.error('gasFormPost失敗:', e);
-    return null;
+    // fetchが失敗した場合はJSONPにフォールバック
+    try{
+      const result = await jsonpFetch(url);
+      return result || {ok:true};
+    }catch(e2){
+      console.error('gasWrite失敗:', e2);
+      return null;
+    }
   }
 }
 
@@ -386,7 +408,7 @@ async function pushProjDataToGas(){
     for(let i=0; i<total; i+=CHUNK){
       const chunk   = PROJ_DATA.slice(i, i+CHUNK);
       const isFirst = (i===0);
-      await gasFormPost({
+      await gasWrite({
         action:  'saveProj',
         idx:     String(i),
         first:   isFirst ? '1' : '0',
@@ -415,7 +437,7 @@ async function pushGasData(id){
     gaichuuDate: gaichuuDates[id]||''
   };
   try{
-    await gasFormPost({action:'saveMeta', data: JSON.stringify(payload)});
+    await gasWrite({action:'saveMeta', data: JSON.stringify(payload)});
   }catch(e){ console.error('GAS書込失敗:', e); }
 }
 function saveProjData(){
@@ -878,6 +900,9 @@ document.body.classList.add('view-mode');
     saveProjData();
     populateFilters();
     renderTable();
+  } else {
+    // GAS取得失敗またはGASが空→localStorageのデータをそのまま使用
+    showStatus('');
   }
 
   // コメント・進捗・外注データを取得して反映
