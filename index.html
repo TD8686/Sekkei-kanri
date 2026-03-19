@@ -301,15 +301,12 @@ function jsonpFetch(url){
 
 // GASからコメント・進捗・外注データを取得
 async function gasRead(url){
-  // まずfetch redirect:followで試みる
   try{
     const res = await fetch(url, {redirect:'follow'});
     const text = await res.text();
-    // JSONP形式の場合はコールバック部分を除去
     const clean = text.replace(/^[^(]+\(/, '').replace(/\)\s*$/, '');
     return JSON.parse(clean);
   }catch(e){
-    // フォールバック：JSONP
     try{ return await jsonpFetch(url); }
     catch(e2){ return null; }
   }
@@ -338,7 +335,6 @@ async function fetchGasData(){
       if(sel){ sel.value=d.progress; sel.className='prog-select '+progCls(d.progress); }
     }
   });
-  console.log('fetchGasData完了: metaデータ件数=', Object.keys(json).length);
   return true;
 }
 
@@ -367,7 +363,6 @@ async function fetchProjDataFromGas(){
     const arr = await gasRead(GAS_URL + '?action=proj&t=' + Date.now());
     // GASが空または失敗した場合はfalseを返してlocalStorageを使う
     if(!arr || !Array.isArray(arr) || arr.length === 0){
-      console.log('GASから工事データなし→localStorageを使用');
       return false;
     }
     // 日付フィールドを正規化
@@ -379,16 +374,11 @@ async function fetchProjDataFromGas(){
     // 正規化後も有効なデータがあるか確認
     const valid = normalized.filter(p=>p.id && p.chakushu);
     if(valid.length === 0){
-      console.log('GAS工事データが無効→localStorageを使用');
       return false;
     }
     PROJ_DATA = normalized;
-    console.log('GASから工事データ取得:', PROJ_DATA.length, '件');
     return true;
-  }catch(e){
-    console.error('fetchProjDataFromGas失敗:', e);
-    return false;
-  }
+  }catch(e){ return false; }
 }
 
 // GASに工事データ本体を保存（CSV更新時に呼ぶ）
@@ -399,19 +389,15 @@ async function gasWrite(params){
     encodeURIComponent(k) + '=' + encodeURIComponent(typeof v==='object'?JSON.stringify(v):String(v))
   ).join('&');
   const url = GAS_URL + '?' + qs;
-  console.log('gasWrite URL:', url.slice(0,120));
   try{
     const res = await fetch(url, {redirect:'follow'});
     const text = await res.text();
-    console.log('gasWrite レスポンス:', text.slice(0,100));
     try{ return JSON.parse(text); }catch(e){ return {ok:true}; }
   }catch(e){
-    console.warn('gasWrite fetch失敗→JSONP:', e.message);
     try{
       const result = await jsonpFetch(url);
       return result || {ok:true};
     }catch(e2){
-      console.error('gasWrite完全失敗:', e2);
       return null;
     }
   }
@@ -454,9 +440,7 @@ async function pushGasData(id){
     gaichuuDate: gaichuuDates[id]||''
   };
   try{
-    console.log('pushGasData送信:', id, payload);
     const result = await gasWrite({action:'saveMeta', data: JSON.stringify(payload)});
-    console.log('pushGasData結果:', id, result);
   }catch(e){ console.error('GAS書込失敗:', e); }
 }
 function saveProjData(){
@@ -620,11 +604,10 @@ function toggleSeisaku(){
   btn.textContent=fSeisaku?'🙈 設計のみ工事を非表示中':'🙈 設計のみ工事を非表示';
   renderTable();
 }
-function setProg(id,sel){ console.log('setProg id=',id,'isEditMode=',isEditMode,'val=',sel.value); if(!isEditMode){ sel.value=progmarks[id]||''; return; } progmarks[id]=sel.value; LSW('sc3_prog',progmarks); sel.className='prog-select '+progCls(sel.value); pushGasData(id); }
+function setProg(id,sel){ if(!isEditMode){ sel.value=progmarks[id]||''; return; } progmarks[id]=sel.value; LSW('sc3_prog',progmarks); sel.className='prog-select '+progCls(sel.value); pushGasData(id); }
 
 // ===== COMMENT =====
 function saveComment(id){
-  console.log('saveComment呼び出し id=', id, 'isEditMode=', isEditMode);
   if(!isEditMode) return;  // 閲覧モード時は保存しない
   const el=document.getElementById(`cta-${id}`); if(!el) return;
   const val=el.value.trim();
@@ -869,7 +852,6 @@ function restoreAllTaSizes(){
 let isEditMode = false;
 function toggleMode(){
   isEditMode = !isEditMode;
-  console.log('モード切替: isEditMode=', isEditMode);
   const btn = document.getElementById('mode-btn');
   if(isEditMode){
     document.body.classList.remove('view-mode');
