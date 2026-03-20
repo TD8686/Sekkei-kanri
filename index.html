@@ -891,22 +891,13 @@ function populateFilters(){
 // ===== TOAST =====
 // ===== textareaサイズ保存・復元 =====
 function saveTaSize(id, type){
-  const el = document.getElementById(`${type}-${id}`);
-  if(!el) return;
-  // offsetHeight で確実に現在の高さを取得
-  const h = el.offsetHeight;
-  if(h > 0) localStorage.setItem(`sc3_tasize_${type}_${id}`, h + 'px');
+  // サイズ保存は行わない（CSSデフォルトで管理）
 }
 function restoreAllTaSizes(){
-  document.querySelectorAll('.comment-ta').forEach(el=>{
-    const id = el.id.replace('cta-','');
-    const saved = localStorage.getItem(`sc3_tasize_cta_${id}`);
-    if(saved) el.style.height = saved;
-  });
-  document.querySelectorAll('.gaichuu-ta').forEach(el=>{
-    const id = el.id.replace('gta-','');
-    const saved = localStorage.getItem(`sc3_tasize_gta_${id}`);
-    if(saved) el.style.height = saved;
+  // サイズはCSSのデフォルトで管理するため復元しない
+  // localStorageの古いサイズデータを削除
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith('sc3_tasize_')) localStorage.removeItem(k);
   });
 }
 
@@ -1032,19 +1023,7 @@ function syncFixedHeader(){
 
 // 横スクロール・リサイズ対応
 window.addEventListener('resize', ()=>{ updateStickyOffsets(); syncFixedHeader(); });
-// resizeドラッグ終了時にサイズを全textarea対象で保存
-window.addEventListener('mouseup', ()=>{
-  document.querySelectorAll('.comment-ta').forEach(el=>{
-    const id = el.id.replace('cta-','');
-    const h = el.offsetHeight;
-    if(h > 0) localStorage.setItem(`sc3_tasize_cta_${id}`, h + 'px');
-  });
-  document.querySelectorAll('.gaichuu-ta').forEach(el=>{
-    const id = el.id.replace('gta-','');
-    const h = el.offsetHeight;
-    if(h > 0) localStorage.setItem(`sc3_tasize_gta_${id}`, h + 'px');
-  });
-});
+// サイズ保存は行わない（CSSデフォルトで管理）
 [0, 200, 500].forEach(ms => setTimeout(()=>{
   updateStickyOffsets();
   syncFixedHeader();
