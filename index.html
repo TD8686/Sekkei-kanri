@@ -861,6 +861,12 @@ function loadOBJ(url){
             fixMat(child.material);
           }
         }
+        // エッジ（面と面の境界線）を表示
+        const edges = new THREE.EdgesGeometry(child.geometry, 30);
+        const line = new THREE.LineSegments(edges,
+          new THREE.LineBasicMaterial({color:0x333333, opacity:0.4, transparent:true})
+        );
+        child.add(line);
       }
     });
     scene.add(obj);
