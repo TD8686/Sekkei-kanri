@@ -420,6 +420,25 @@ async function fetchGasData(){
       const sel=document.getElementById(`prog-${id}`);
       if(sel){ sel.value=d.progress; sel.className='prog-select '+progCls(d.progress); }
     }
+    // 3D URL入力欄と3Dボタンを反映
+    if(d.url3d !== undefined){
+      urls3d[id] = d.url3d;
+      const urlInput = document.getElementById(`url3d-${id}`);
+      if(urlInput) urlInput.value = d.url3d;
+      const td = document.getElementById(`td3d-${id}`);
+      if(td){
+        let btn = td.querySelector('.btn-3d');
+        if(d.url3d && !btn){
+          btn = document.createElement('button');
+          btn.className = 'btn-3d';
+          btn.textContent = '3D';
+          btn.onclick = ()=> openViewer(id);
+          td.insertBefore(btn, td.firstChild);
+        } else if(!d.url3d && btn){
+          btn.remove();
+        }
+      }
+    }
   });
   return true;
 }
@@ -775,7 +794,7 @@ function loadOBJ(url){
   const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
   renderer.setSize(W, H);
   renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setClearColor(0x1a1a2e);
+  renderer.setClearColor(0xe8e0d0);
   window._viewerRenderer = renderer;
 
   const scene  = new THREE.Scene();
@@ -793,11 +812,11 @@ function loadOBJ(url){
   controls.maxDistance    = 100;
   window._viewerControls = controls;
 
-  // ライト
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const dLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  // ライト（均一で見やすい照明）
+  scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+  const dLight = new THREE.DirectionalLight(0xffffff, 0.4);
   dLight.position.set(1,2,3); scene.add(dLight);
-  const dLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+  const dLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
   dLight2.position.set(-1,-1,-2); scene.add(dLight2);
 
   // パス解析
@@ -813,20 +832,33 @@ function loadOBJ(url){
     const scale  = 3 / maxDim;
     obj.scale.setScalar(scale);
     obj.position.sub(center.multiplyScalar(scale));
-    // MTLがなければデフォルトマテリアル適用
+
+    // マテリアル処理
+    function fixMat(m){
+      m.side = THREE.DoubleSide;
+      // 光沢を除去（マットな見た目に）
+      if(m.specular) m.specular.setHex(0x000000);
+      m.shininess = 0;
+      // 黒色(Kd 0 0 0)の場合はデフォルト色に置き換え
+      if(m.color){
+        const c = m.color;
+        if(c.r < 0.05 && c.g < 0.05 && c.b < 0.05){
+          c.setHex(0x88aacc);
+        }
+      }
+    }
+
     obj.traverse(child => {
       if(child.isMesh){
         if(!hasMtl){
-          child.material = new THREE.MeshPhongMaterial({
-            color:0x88aacc, specular:0x222222, shininess:30, side:THREE.DoubleSide
+          child.material = new THREE.MeshLambertMaterial({
+            color:0x88aacc, side:THREE.DoubleSide
           });
         } else {
-          if(child.material){
-            if(Array.isArray(child.material)){
-              child.material.forEach(m=>{ m.side=THREE.DoubleSide; });
-            } else {
-              child.material.side = THREE.DoubleSide;
-            }
+          if(Array.isArray(child.material)){
+            child.material.forEach(fixMat);
+          } else if(child.material){
+            fixMat(child.material);
           }
         }
       }
