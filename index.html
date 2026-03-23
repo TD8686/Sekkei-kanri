@@ -758,20 +758,20 @@ function openViewer(id){
 function closeViewer(){
   document.getElementById('viewer-overlay').classList.remove('open');
   if(window._viewerAnimId){ cancelAnimationFrame(window._viewerAnimId); }
+  if(window._viewerControls){ window._viewerControls.dispose(); window._viewerControls=null; }
   if(window._viewerRenderer){ window._viewerRenderer.dispose(); window._viewerRenderer=null; }
 }
 
 function loadOBJ(url){
   const canvas = document.getElementById('viewer-canvas');
   const wrap   = document.getElementById('viewer-canvas-wrap');
-
-  // Three.js初期化
   const THREE = window.THREE;
   if(!THREE){ alert('3Dライブラリの読み込みに失敗しました。'); return; }
 
   if(window._viewerRenderer){ window._viewerRenderer.dispose(); }
+  if(window._viewerControls){ window._viewerControls.dispose(); }
 
-  const W = wrap.clientWidth, H = wrap.clientHeight - 0;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
   const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
   renderer.setSize(W, H);
   renderer.setPixelRatio(window.devicePixelRatio);
@@ -782,6 +782,17 @@ function loadOBJ(url){
   const camera = new THREE.PerspectiveCamera(45, W/H, 0.01, 10000);
   camera.position.set(0, 0, 5);
 
+  // OrbitControls（なめらか回転・パン・ズーム）
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.rotateSpeed   = 0.8;
+  controls.panSpeed      = 0.8;
+  controls.zoomSpeed     = 1.2;
+  controls.minDistance    = 0.1;
+  controls.maxDistance    = 100;
+  window._viewerControls = controls;
+
   // ライト
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
   const dLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -789,10 +800,12 @@ function loadOBJ(url){
   const dLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
   dLight2.position.set(-1,-1,-2); scene.add(dLight2);
 
-  // OBJ読み込み
-  const loader = new THREE.OBJLoader();
-  loader.load(url, (obj)=>{
-    // バウンディングボックスで自動スケール・センタリング
+  // パス解析
+  const basePath = url.substring(0, url.lastIndexOf('/') + 1);
+  const mtlFile  = url.substring(url.lastIndexOf('/') + 1).replace(/\.obj$/i, '.mtl');
+
+  // モデル配置共通処理
+  function addObject(obj, hasMtl){
     const box = new THREE.Box3().setFromObject(obj);
     const center = box.getCenter(new THREE.Vector3());
     const size   = box.getSize(new THREE.Vector3());
@@ -800,55 +813,59 @@ function loadOBJ(url){
     const scale  = 3 / maxDim;
     obj.scale.setScalar(scale);
     obj.position.sub(center.multiplyScalar(scale));
-
-    // マテリアル設定
-    obj.traverse(child=>{
+    // MTLがなければデフォルトマテリアル適用
+    obj.traverse(child => {
       if(child.isMesh){
-        child.material = new THREE.MeshPhongMaterial({
-          color:0x88aacc, specular:0x222222, shininess:30, side:THREE.DoubleSide
-        });
+        if(!hasMtl){
+          child.material = new THREE.MeshPhongMaterial({
+            color:0x88aacc, specular:0x222222, shininess:30, side:THREE.DoubleSide
+          });
+        } else {
+          if(child.material){
+            if(Array.isArray(child.material)){
+              child.material.forEach(m=>{ m.side=THREE.DoubleSide; });
+            } else {
+              child.material.side = THREE.DoubleSide;
+            }
+          }
+        }
       }
     });
     scene.add(obj);
+    controls.target.set(0,0,0);
+    controls.update();
     document.getElementById('viewer-loading').style.display='none';
-  },
-  undefined,
-  (err)=>{ document.getElementById('viewer-loading').textContent='読み込み失敗: ファイルが見つかりません。パスとファイル名を確認してください。'; }
-  );
+  }
 
-  // マウス操作
-  let isDragging=false, isRight=false, lastX=0, lastY=0;
-  let rotX=0, rotY=0, panX=0, panY=0, zoom=5;
-  canvas.addEventListener('mousedown', e=>{isDragging=true; isRight=e.button===2; lastX=e.clientX; lastY=e.clientY;});
-  canvas.addEventListener('contextmenu', e=>e.preventDefault());
-  window.addEventListener('mouseup', ()=>isDragging=false);
-  window.addEventListener('mousemove', e=>{
-    if(!isDragging) return;
-    const dx=e.clientX-lastX, dy=e.clientY-lastY;
-    if(isRight){ panX+=dx*0.01; panY-=dy*0.01; }
-    else { rotY+=dx*0.5; rotX+=dy*0.5; }
-    lastX=e.clientX; lastY=e.clientY;
+  function loadErr(){
+    document.getElementById('viewer-loading').textContent='読み込み失敗: ファイルが見つかりません。パスとファイル名を確認してください。';
+  }
+
+  // MTLがあれば色付き、なければデフォルト色で読み込み
+  fetch(basePath + mtlFile, {method:'HEAD'}).then(r => {
+    if(r.ok){
+      const mtlLoader = new THREE.MTLLoader();
+      mtlLoader.setPath(basePath);
+      mtlLoader.load(mtlFile, (materials) => {
+        materials.preload();
+        const objLoader = new THREE.OBJLoader();
+        objLoader.setMaterials(materials);
+        objLoader.setPath(basePath);
+        objLoader.load(url.substring(url.lastIndexOf('/')+1), (obj)=>addObject(obj,true), undefined, loadErr);
+      }, undefined, () => {
+        new THREE.OBJLoader().load(url, (obj)=>addObject(obj,false), undefined, loadErr);
+      });
+    } else {
+      new THREE.OBJLoader().load(url, (obj)=>addObject(obj,false), undefined, loadErr);
+    }
+  }).catch(() => {
+    new THREE.OBJLoader().load(url, (obj)=>addObject(obj,false), undefined, loadErr);
   });
-  canvas.addEventListener('wheel', e=>{ zoom=Math.max(0.1, zoom+e.deltaY*0.01); e.preventDefault(); },{passive:false});
-
-  // タッチ操作
-  let lastTouchDist=0;
-  canvas.addEventListener('touchstart', e=>{ if(e.touches.length===2){ lastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); }});
-  canvas.addEventListener('touchmove', e=>{
-    e.preventDefault();
-    if(e.touches.length===1){ const t=e.touches[0]; const dx=t.clientX-lastX,dy=t.clientY-lastY; rotY+=dx*0.5; rotX+=dy*0.5; lastX=t.clientX; lastY=t.clientY; }
-    if(e.touches.length===2){ const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); zoom=Math.max(0.1,zoom-(d-lastTouchDist)*0.05); lastTouchDist=d; }
-  },{passive:false});
 
   // アニメーション
   function animate(){
     window._viewerAnimId = requestAnimationFrame(animate);
-    camera.position.set(
-      Math.sin(THREE.MathUtils.degToRad(rotY))*Math.cos(THREE.MathUtils.degToRad(rotX))*zoom + panX,
-      Math.sin(THREE.MathUtils.degToRad(rotX))*zoom + panY,
-      Math.cos(THREE.MathUtils.degToRad(rotY))*Math.cos(THREE.MathUtils.degToRad(rotX))*zoom
-    );
-    camera.lookAt(panX, panY, 0);
+    controls.update();
     renderer.render(scene, camera);
   }
   animate();
@@ -1226,50 +1243,10 @@ window.addEventListener('resize', ()=>{ updateStickyOffsets(); syncFixedHeader()
 
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
 <script>
-// OBJLoader (Three.js r128用 inline実装)
-(function(){
-  class OBJLoader{
-    load(url, onLoad, onProgress, onError){
-      fetch(url).then(r=>r.text()).then(text=>{
-        onLoad(this.parse(text));
-      }).catch(onError);
-    }
-    parse(text){
-      const THREE=window.THREE;
-      const obj=new THREE.Group();
-      const verts=[],normals=[],uvs=[];
-      const geoData={verts:[],normals:[],uvs:[]};
-      let geo=new THREE.BufferGeometry();
-      const addMesh=()=>{
-        if(geoData.verts.length===0) return;
-        geo.setAttribute('position',new THREE.Float32BufferAttribute(geoData.verts,3));
-        if(geoData.normals.length) geo.setAttribute('normal',new THREE.Float32BufferAttribute(geoData.normals,3));
-        geo.computeVertexNormals();
-        obj.add(new THREE.Mesh(geo,new THREE.MeshPhongMaterial({color:0x88aacc,side:THREE.DoubleSide})));
-        geo=new THREE.BufferGeometry();
-        geoData.verts.length=0; geoData.normals.length=0; geoData.uvs.length=0;
-      };
-      for(const line of text.split('\n')){
-        const p=line.trim().split(/\s+/);
-        if(p[0]==='v')  verts.push(+p[1],+p[2],+p[3]);
-        else if(p[0]==='vn') normals.push(+p[1],+p[2],+p[3]);
-        else if(p[0]==='f'){
-          const face=p.slice(1).map(s=>{const i=s.split('/');return{v:+i[0]-1,n:i[2]?+i[2]-1:-1};});
-          for(let i=1;i<face.length-1;i++){
-            for(const fi of [face[0],face[i],face[i+1]]){
-              geoData.verts.push(verts[fi.v*3],verts[fi.v*3+1],verts[fi.v*3+2]);
-              if(fi.n>=0) geoData.normals.push(normals[fi.n*3],normals[fi.n*3+1],normals[fi.n*3+2]);
-            }
-          }
-        } else if(p[0]==='o'||p[0]==='g') addMesh();
-      }
-      addMesh();
-      return obj;
-    }
-  }
-  THREE.OBJLoader=OBJLoader;
-})();
 
 // ビューアオーバーレイ背景クリックで閉じる
 document.getElementById('viewer-overlay').addEventListener('click',function(e){
