@@ -801,17 +801,15 @@ function loadOBJ(url){
   const camera = new THREE.PerspectiveCamera(45, W/H, 0.01, 10000);
   camera.position.set(0, 0, 5);
 
-  // OrbitControls
-  const controls = new THREE.OrbitControls(camera, canvas);
-  controls.enableDamping = false;
-  controls.rotateSpeed   = 1.0;
+  // TrackballControls（全方向自由回転・ひっかかりなし）
+  const controls = new THREE.TrackballControls(camera, canvas);
+  controls.rotateSpeed   = 3.0;
   controls.panSpeed      = 1.0;
   controls.zoomSpeed     = 1.5;
-  controls.minDistance    = 0.1;
-  controls.maxDistance    = 100;
-  // 回転制限を緩和（上下のひっかかり防止）
-  controls.minPolarAngle = 0.01;
-  controls.maxPolarAngle = Math.PI - 0.01;
+  controls.noZoom        = false;
+  controls.noPan         = false;
+  controls.staticMoving  = true;
+  controls.dynamicDampingFactor = 0;
   window._viewerControls = controls;
 
   // ライト（均一で色が正確に見える照明）
@@ -839,22 +837,42 @@ function loadOBJ(url){
     // マテリアル処理
     function fixMat(m){
       m.side = THREE.DoubleSide;
-      // 光沢を除去
+      // Phong系マテリアルの光沢を完全除去
       if(m.specular) m.specular.setHex(0x000000);
       m.shininess = 0;
-      // 暗すぎる色をデフォルト色に置き換え（閾値を広めに）
+      // テクスチャが読み込み失敗で黒くなる問題の対策
+      // map(テクスチャ)が設定されているがimageが無い場合は削除してKd色で表示
+      if(m.map && (!m.map.image || !m.map.image.complete || m.map.image.naturalWidth === 0)){
+        m.map = null;
+      }
+      if(m.aoMap && (!m.aoMap.image)){ m.aoMap = null; }
+      // 暗すぎる色をデフォルト色に置き換え
       if(m.color){
         const c = m.color;
         if(c.r < 0.15 && c.g < 0.15 && c.b < 0.15){
           c.setHex(0x88aacc);
         }
       }
-      // 透明度が設定されている場合は不透明に
       if(m.opacity !== undefined && m.opacity < 0.5){
         m.opacity = 1.0;
         m.transparent = false;
       }
     }
+
+    // MTL読み込み後にテクスチャ欠損を再チェック（遅延ロード対策）
+    setTimeout(()=>{
+      obj.traverse(child => {
+        if(child.isMesh){
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach(m => {
+            if(m && m.map && (!m.map.image || m.map.image.naturalWidth === 0)){
+              m.map = null;
+              m.needsUpdate = true;
+            }
+          });
+        }
+      });
+    }, 2000);
 
     obj.traverse(child => {
       if(child.isMesh){
@@ -890,10 +908,19 @@ function loadOBJ(url){
   // MTLがあれば色付き、なければデフォルト色で読み込み
   fetch(basePath + mtlFile, {method:'HEAD'}).then(r => {
     if(r.ok){
-      const mtlLoader = new THREE.MTLLoader();
+      // テクスチャ読み込み失敗時のハンドラ
+      const manager = new THREE.LoadingManager();
+      manager.onError = function(url){ /* テクスチャ欠損は無視 */ };
+      const mtlLoader = new THREE.MTLLoader(manager);
       mtlLoader.setPath(basePath);
       mtlLoader.load(mtlFile, (materials) => {
         materials.preload();
+        // テクスチャが読み込めなかったマテリアルのmapをnullに
+        Object.values(materials.materials).forEach(m => {
+          if(m.map && (!m.map.image || m.map.image.naturalWidth === 0)){
+            m.map = null;
+          }
+        });
         const objLoader = new THREE.OBJLoader();
         objLoader.setMaterials(materials);
         objLoader.setPath(basePath);
@@ -909,6 +936,7 @@ function loadOBJ(url){
   });
 
   // アニメーション
+  controls.handleResize();
   function animate(){
     window._viewerAnimId = requestAnimationFrame(animate);
     controls.update();
@@ -1289,7 +1317,7 @@ window.addEventListener('resize', ()=>{ updateStickyOffsets(); syncFixedHeader()
 
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TrackballControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
 <script>
