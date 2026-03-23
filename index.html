@@ -300,8 +300,8 @@ body.view-mode .btn-csv{
   <th class="col-hikitori">⑩引取/立会/発送</th>
   <th class="col-gaichuu">⑪外注予定&amp;決定 <span style="font-size:9px;color:var(--accent2)">🔒</span></th>
   <th class="col-eigyo">⑫営業担当</th>
-  <th style="min-width:90px">3Dモデル</th>
   <th class="col-sekkei">⑬設計担当</th>
+  <th style="min-width:90px">3Dモデル</th>
 </tr>
 </table>
 </div>
@@ -731,8 +731,7 @@ function saveUrl3d(id, url){
 
 function openViewer(id){
   let url = urls3d[id] || '';
-  if(!url){ alert('Google Drive URLが登録されていません。
-編集モードでURLを入力してください。'); return; }
+  if(!url){ alert('Google Drive URLが登録されていません。\n編集モードでURLを入力してください。'); return; }
   // Google DriveのURLをOBJ直接リンクに変換
   // 共有URL: https://drive.google.com/file/d/FILE_ID/view
   // 直接URL: https://drive.google.com/uc?export=download&id=FILE_ID
