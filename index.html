@@ -693,7 +693,7 @@ function renderTable(){
         ${urls3d[p.id]?`<button class="btn-3d" onclick="openViewer('${p.id}')">3D</button>`:''}
         <input class="url-3d-input" id="url3d-${p.id}"
           value="${urls3d[p.id]||''}"
-          placeholder="Google Drive URL"
+          placeholder="例: models/145690.obj"
           onblur="saveUrl3d('${p.id}',this.value)">
       </td>`; 
     tbody.appendChild(tr);
@@ -746,18 +746,12 @@ function saveUrl3d(id, url){
 
 function openViewer(id){
   let url = urls3d[id] || '';
-  if(!url){ alert('Google Drive URLが登録されていません。\n編集モードでURLを入力してください。'); return; }
-  // Google DriveのURLをOBJ直接リンクに変換
-  // 共有URL: https://drive.google.com/file/d/FILE_ID/view
-  // 直接URL: https://drive.google.com/uc?export=download&id=FILE_ID
-  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  if(match){
-    url = 'https://drive.google.com/uc?export=download&id=' + match[1];
-  }
+  if(!url){ alert('3DファイルのパスがURL欄に未登録です。\n編集モードでパスを入力してください。'); return; }
   const title = PROJ_DATA.find(p=>p.id===id)?.buhinmei || id;
   document.getElementById('viewer-title').textContent = title;
   document.getElementById('viewer-overlay').classList.add('open');
   document.getElementById('viewer-loading').style.display='flex';
+  document.getElementById('viewer-loading').textContent='3Dモデルを読み込み中...';
   loadOBJ(url);
 }
 
@@ -819,7 +813,7 @@ function loadOBJ(url){
     document.getElementById('viewer-loading').style.display='none';
   },
   undefined,
-  (err)=>{ document.getElementById('viewer-loading').textContent='読み込み失敗: CORSエラーの可能性があります'; }
+  (err)=>{ document.getElementById('viewer-loading').textContent='読み込み失敗: ファイルが見つかりません。パスとファイル名を確認してください。'; }
   );
 
   // マウス操作
