@@ -169,6 +169,10 @@ body.view-mode .btn-csv{
   pointer-events:none;
   cursor:not-allowed;
 }
+/* 閲覧モード時：3D URL入力欄を非表示 */
+body.view-mode .url-3d-input{
+  display:none;
+}
 
 /* ===== 3Dビューア ===== */
 .btn-3d{
@@ -687,10 +691,10 @@ function renderTable(){
       <td class="col-sekkei">${p.sekkei||'—'}</td>
       <td style="text-align:center;vertical-align:middle" id="td3d-${p.id}">
         ${urls3d[p.id]?`<button class="btn-3d" onclick="openViewer('${p.id}')">3D</button>`:''}
-        ${isEditMode?`<input class="url-3d-input" id="url3d-${p.id}"
+        <input class="url-3d-input" id="url3d-${p.id}"
           value="${urls3d[p.id]||''}"
           placeholder="Google Drive URL"
-          onblur="saveUrl3d('${p.id}',this.value)">`:''}
+          onblur="saveUrl3d('${p.id}',this.value)">
       </td>`; 
     tbody.appendChild(tr);
   });
@@ -724,9 +728,20 @@ function saveUrl3d(id, url){
   LSW('sc3_urls3d', urls3d);
   // GASにも保存（metaデータとして）
   pushGasData(id);
-  // ボタンのスタイル更新
-  const btn = document.querySelector(`#td3d-${id} .btn-3d`);
-  if(btn){ btn.className = 'btn-3d' + (url?'':' no-url'); }
+  // 3Dボタンを動的に追加/削除
+  const td = document.getElementById(`td3d-${id}`);
+  if(td){
+    let btn = td.querySelector('.btn-3d');
+    if(url && !btn){
+      btn = document.createElement('button');
+      btn.className = 'btn-3d';
+      btn.textContent = '3D';
+      btn.onclick = ()=> openViewer(id);
+      td.insertBefore(btn, td.firstChild);
+    } else if(!url && btn){
+      btn.remove();
+    }
+  }
 }
 
 function openViewer(id){
