@@ -650,7 +650,7 @@ function renderTable(){
       const lbl=wk==='__NODATE__'?'📅 日付未定':`📅 週: ${fmtWeekLabel(wk)}`;
       const sum=`<span class="week-summary"><span class="wk-shinki">新規 ${sk}工事</span>　<span class="wk-kaizo">改造 ${kz}工事</span>　出図予定</span>`;
       const tr=document.createElement('tr'); tr.className='week-label';
-      tr.innerHTML=`<td colspan="14">${lbl}${sum}</td>`;
+      tr.innerHTML=`<td colspan="15">${lbl}${sum}</td>`;
       tbody.appendChild(tr); lastWk=wk;
     }
     const com=comments[p.id]||'',cd=commentDates[p.id]||'';
