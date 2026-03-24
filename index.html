@@ -30,7 +30,7 @@ header{background:var(--surface);border-bottom:2px solid var(--border2);padding:
 .summary-card.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(74,127,212,.2)}
 .summary-card .num{font-size:26px;font-weight:900;font-family:'JetBrains Mono',monospace;line-height:1;margin-bottom:3px}
 .summary-card .lbl{font-size:10px;color:var(--text2)}
-.c-all .num{color:var(--text)} .c-new .num{color:var(--accent)} .c-kai .num{color:var(--warn)} .c-commented .num{color:var(--accent2)}
+.c-all .num{color:var(--text)} .c-new .num{color:var(--accent)} .c-kai .num{color:var(--warn)}
 .toolbar{padding:8px 18px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:98;background:var(--bg);border-bottom:1px solid var(--border);}
 .search-box{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:0 10px;flex:1;min-width:200px;box-shadow:var(--shadow)}
 .search-box input{background:none;border:none;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:8px 0;outline:none;width:100%}
@@ -287,7 +287,6 @@ body.view-mode .url-3d-input{
   <div class="summary-card c-all active" data-filter="all"><div class="num" id="cnt-all">0</div><div class="lbl">全工事</div></div>
   <div class="summary-card c-new"  data-filter="shinki"><div class="num" id="cnt-shinki">0</div><div class="lbl">新規</div></div>
   <div class="summary-card c-kai"  data-filter="kaizo"><div class="num" id="cnt-kaizo">0</div><div class="lbl">改造</div></div>
-  <div class="summary-card c-commented" data-filter="commented"><div class="num" id="cnt-commented">0</div><div class="lbl">📝 コメントあり</div></div>
 </div>
 <div class="toolbar">
   <button class="mode-badge view-mode" id="mode-btn" onclick="toggleMode()" title="クリックで編集モードに切替">👁 閲覧</button>
@@ -654,8 +653,7 @@ function getFiltered(){
     if(fSeisaku&&hasSeisakuOnly) return false;
     const mM=fMain==='all'
       ||(fMain==='shinki'&&p.kubun.includes('新規'))
-      ||(fMain==='kaizo'&&(p.kubun.includes('改造')||p.kubun.includes('改')))
-      ||(fMain==='commented'&&!!comments[p.id]);
+      ||(fMain==='kaizo'&&(p.kubun.includes('改造')||p.kubun.includes('改')));
     return !!p.chakushu&&mM&&(!fSekkei||p.sekkei===fSekkei)&&(!fEigyo||p.eigyo===fEigyo)
       &&(!q||[p.kojino,p.buhinmei,p.sekkei,p.eigyo,p.ryakusho,p.pjno].some(v=>(v||'').toLowerCase().includes(q)));
   });
@@ -738,7 +736,6 @@ function updateCounts(){
   document.getElementById('cnt-all').textContent=base.length;
   document.getElementById('cnt-shinki').textContent=base.filter(p=>p.kubun.includes('新規')).length;
   document.getElementById('cnt-kaizo').textContent=base.filter(p=>p.kubun.includes('改造')||p.kubun.includes('改')).length;
-  document.getElementById('cnt-commented').textContent=Object.keys(comments).filter(k=>comments[k]).length;
 }
 
 // ===== PROGRESS =====
