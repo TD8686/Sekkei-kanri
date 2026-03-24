@@ -211,6 +211,11 @@ body.view-mode .url-3d-input{
   line-height:1;padding:0 4px;transition:color .15s;
 }
 #viewer-close:hover{color:var(--danger);}
+#viewer-close.mobile-close{
+  font-size:32px;background:var(--surface2);border-radius:50%;
+  width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  border:2px solid var(--border2);color:var(--danger);
+}
 #viewer-canvas-wrap{flex:1;position:relative;background:#e8e0d0;}
 #viewer-canvas{width:100%;height:100%;display:block;}
 #viewer-hint{
@@ -772,13 +777,24 @@ function openViewer(id){
   if(!url){ alert('3DファイルのパスがURL欄に未登録です。\n編集モードでパスを入力してください。'); return; }
   const title = PROJ_DATA.find(p=>p.id===id)?.buhinmei || id;
   document.getElementById('viewer-title').textContent = title;
-  // スマホ判定：実際の画面幅が800px未満なら全画面表示
+
+  // スマホ判定
+  const isMobile = window.screen.width < 800 || ('ontouchstart' in window && window.screen.width < 1200);
   const popup = document.getElementById('viewer-popup');
-  if(window.screen.width < 800 || ('ontouchstart' in window && window.screen.width < 1200)){
+  const closeBtn = document.getElementById('viewer-close');
+
+  if(isMobile){
     popup.classList.add('mobile-fullscreen');
+    closeBtn.classList.add('mobile-close');
+    // viewportをスマホ用に一時切替（実画面サイズに合わせる）
+    const vp = document.querySelector('meta[name="viewport"]');
+    window._savedViewport = vp.getAttribute('content');
+    vp.setAttribute('content', 'width=device-width, initial-scale=1.0, user-scalable=no');
   } else {
     popup.classList.remove('mobile-fullscreen');
+    closeBtn.classList.remove('mobile-close');
   }
+
   document.getElementById('viewer-overlay').classList.add('open');
   document.getElementById('viewer-loading').style.display='flex';
   document.getElementById('viewer-loading').textContent='3Dモデルを読み込み中...';
@@ -787,9 +803,16 @@ function openViewer(id){
 
 function closeViewer(){
   document.getElementById('viewer-overlay').classList.remove('open');
+  document.getElementById('viewer-popup').classList.remove('mobile-fullscreen');
+  document.getElementById('viewer-close').classList.remove('mobile-close');
   if(window._viewerAnimId){ cancelAnimationFrame(window._viewerAnimId); }
   if(window._viewerControls){ window._viewerControls.dispose(); window._viewerControls=null; }
   if(window._viewerRenderer){ window._viewerRenderer.dispose(); window._viewerRenderer=null; }
+  // viewportを元に戻す
+  if(window._savedViewport){
+    document.querySelector('meta[name="viewport"]').setAttribute('content', window._savedViewport);
+    window._savedViewport = null;
+  }
 }
 
 function loadOBJ(url){
