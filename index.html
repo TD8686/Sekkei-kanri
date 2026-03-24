@@ -909,26 +909,73 @@ function loadOBJ(url){
     document.getElementById('viewer-loading').style.display='none';
   }
 
-  function loadErr(){
+  function loadErr(msg){
     document.getElementById('viewer-loading').textContent=
-      '読み込み失敗: ファイルが見つかりません。パスとファイル名を確認してください。';
+      msg || '読み込み失敗: ファイルが見つかりません。パスとファイル名を確認してください。';
+  }
+
+  // ===== fetch + 進捗表示 =====
+  async function fetchWithProgress(fetchUrl, label){
+    const loadingEl = document.getElementById('viewer-loading');
+    const res = await fetch(fetchUrl, {redirect:'follow'});
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const contentLength = res.headers.get('content-length');
+    if(!contentLength || !res.body){
+      // 進捗表示できない場合はそのまま読み込み
+      loadingEl.textContent = label + ' ダウンロード中...';
+      return await res.text();
+    }
+    const total = parseInt(contentLength, 10);
+    let loaded = 0;
+    const reader = res.body.getReader();
+    const chunks = [];
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      chunks.push(value);
+      loaded += value.length;
+      const mb = (loaded / 1024 / 1024).toFixed(1);
+      const totalMb = (total / 1024 / 1024).toFixed(1);
+      const pct = Math.round(loaded / total * 100);
+      loadingEl.textContent = label + ' ダウンロード中... ' + mb + 'MB / ' + totalMb + 'MB (' + pct + '%)';
+    }
+    // Uint8Arrayを結合してテキストにデコード
+    const allBytes = new Uint8Array(loaded);
+    let pos = 0;
+    for(const chunk of chunks){ allBytes.set(chunk, pos); pos += chunk.length; }
+    return new TextDecoder().decode(allBytes);
   }
 
   // ===== 読み込み実行 =====
-  // 1. MTLをテキストで取得してKd色を抽出
-  // 2. OBJLoaderで読み込み（MTLLoaderは使わない）
-  // 3. マテリアルをKd色のLambertMaterialに置換
-  fetch(mtlUrl).then(r => {
-    if(!r.ok) throw new Error('no mtl');
-    return r.text();
-  }).then(mtlText => {
-    const mtlColors = parseMtlColors(mtlText);
+  async function doLoad(){
+    const loadingEl = document.getElementById('viewer-loading');
     const loader = new THREE.OBJLoader();
-    loader.load(url, (obj) => addObject(obj, mtlColors), undefined, loadErr);
-  }).catch(() => {
-    const loader = new THREE.OBJLoader();
-    loader.load(url, (obj) => addObject(obj, null), undefined, loadErr);
-  });
+    let mtlColors = null;
+
+    // 1. MTLをfetchしてKd色を抽出
+    try{
+      loadingEl.textContent = 'MTLファイルを確認中...';
+      const mtlText = await fetchWithProgress(mtlUrl, 'MTL');
+      mtlColors = parseMtlColors(mtlText);
+    }catch(e){
+      // MTLがなくてもOBJだけで表示する
+    }
+
+    // 2. OBJをfetchしてテキスト取得
+    try{
+      loadingEl.textContent = 'OBJファイルをダウンロード中...';
+      const objText = await fetchWithProgress(url, '3Dモデル');
+
+      // 3. パースしてシーンに追加
+      loadingEl.textContent = '3Dモデルを描画中...';
+      await new Promise(r => setTimeout(r, 50)); // UI更新を待つ
+      const obj = loader.parse(objText);
+      addObject(obj, mtlColors);
+    }catch(e){
+      loadErr('読み込み失敗: ' + e.message);
+    }
+  }
+  doLoad();
 
   // アニメーション
   function animate(){
