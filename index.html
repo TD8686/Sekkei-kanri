@@ -360,6 +360,19 @@ body.view-mode .url-3d-input{
 </div>
 </div>
 
+<div class="modal-overlay" id="modal-unused3d">
+<div class="modal" style="max-width:600px">
+  <h3>🗑️ 不要3Dファイルの検出</h3>
+  <p>以下の工事は出図完了しましたが、3Dファイルが残っています。<br>
+    フォルダから該当ファイルを削除した後「削除済みにする」を押してください。</p>
+  <div id="unused3d-list" style="max-height:300px;overflow-y:auto;margin:10px 0"></div>
+  <div class="modal-btns">
+    <button class="btn-secondary" onclick="closeModal('unused3d')">後で対応する</button>
+    <button class="btn-primary" onclick="clearUnused3d()">選択したものを削除済みにする</button>
+  </div>
+</div>
+</div>
+
 
 </div>
 
@@ -1175,6 +1188,11 @@ function applyCSV(){
     } else {
       showToast(`⚠ GAS保存に失敗しました。localStorageには保存済みです`);
     }
+    // 不要3Dファイルのチェック
+    const unused = checkUnused3dFiles();
+    if(unused.length > 0){
+      setTimeout(()=> showUnused3dFiles(unused), 500);
+    }
   }, 50);
 }
 
@@ -1208,6 +1226,60 @@ function applyGaichuu(){
 function openModal(t){ document.getElementById(`modal-${t}`).classList.add('open'); }
 function closeModal(t){ document.getElementById(`modal-${t}`).classList.remove('open'); }
 document.querySelectorAll('.modal-overlay').forEach(el=>el.addEventListener('click',e=>{ if(e.target===el) el.classList.remove('open'); }));
+
+// ===== 不要3Dファイル検出 =====
+function checkUnused3dFiles(){
+  const currentIds = new Set(PROJ_DATA.map(p=>p.id));
+  const unused = [];
+  Object.entries(urls3d).forEach(([id, url])=>{
+    if(url && !currentIds.has(id)){
+      // URLからファイル名を抽出
+      const fileName = url.substring(url.lastIndexOf('/')+1);
+      const mtlName = fileName.replace(/\.obj$/i, '.mtl');
+      // 保存先を判定
+      let storage = 'GitHub（100MB未満フォルダ）';
+      if(url.includes('netlify.app')){
+        storage = 'Netlify（100MB以上フォルダ）';
+      }
+      unused.push({id, url, fileName, mtlName, storage});
+    }
+  });
+  return unused;
+}
+
+function showUnused3dFiles(unused){
+  if(!unused || unused.length === 0) return;
+  const listEl = document.getElementById('unused3d-list');
+  listEl.innerHTML = unused.map(u => `
+    <div style="padding:8px 10px;margin-bottom:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px">
+      <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+        <input type="checkbox" class="unused3d-check" value="${u.id}" checked style="margin-top:3px">
+        <div>
+          <div style="font-weight:700;font-size:12px">工事番号: ${u.id}</div>
+          <div style="font-size:11px;color:var(--text2)">OBJ: ${u.fileName}</div>
+          <div style="font-size:11px;color:var(--text2)">MTL: ${u.mtlName}</div>
+          <div style="font-size:10px;color:var(--warn);font-weight:600;margin-top:2px">📁 ${u.storage}</div>
+        </div>
+      </label>
+    </div>
+  `).join('');
+  openModal('unused3d');
+}
+
+async function clearUnused3d(){
+  const checks = document.querySelectorAll('.unused3d-check:checked');
+  const ids = Array.from(checks).map(c=>c.value);
+  if(ids.length === 0){ alert('削除済みにする項目を選択してください'); return; }
+  for(const id of ids){
+    urls3d[id] = '';
+    LSW('sc3_urls3d', urls3d);
+    // GASのurl3d情報もクリア
+    await pushGasData(id);
+  }
+  closeModal('unused3d');
+  renderTable();
+  showToast(`${ids.length} 件の3Dファイル情報をクリアしました`);
+}
 
 // ===== FILTER EVENTS =====
 document.querySelectorAll('.summary-card').forEach(c=>c.addEventListener('click',()=>{
