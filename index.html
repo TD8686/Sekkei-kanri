@@ -280,7 +280,10 @@ body.view-mode .url-3d-input{
 </div>
 <header>
   <div class="logo"><div class="logo-icon">⚙</div>設計進捗管理システム</div>
-  <span id="current-date" class="date-badge"></span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="schedule-update" class="date-badge" style="color:var(--accent);font-weight:700;display:none">📅 スケジュール更新日：</span>
+    <span id="current-date" class="date-badge"></span>
+  </div>
 <span id="gas-status" style="font-size:10px;color:var(--muted);margin-left:8px"></span>
 </header>
 <div class="summary-bar">
@@ -1188,6 +1191,8 @@ function applyCSV(){
     } else {
       showToast(`⚠ GAS保存に失敗しました。localStorageには保存済みです`);
     }
+    // スケジュール更新日を保存・表示
+    saveScheduleUpdate();
     // 不要3Dファイルのチェック
     const unused = checkUnused3dFiles();
     if(unused.length > 0){
@@ -1220,6 +1225,37 @@ function applyGaichuu(){
   LSW('sc3_gaichuu',gaichuu); LSW('sc3_gdates',gaichuuDates);
   pendingGaichuu=null; closeModal('gaichuu'); renderTable();
   showToast(`外注予定&決定を ${Object.keys(gaichuu).length} 件更新しました`);
+}
+
+// ===== スケジュール更新日 =====
+function formatScheduleDate(){
+  const n = new Date();
+  const d = ['日','月','火','水','木','金','土'];
+  return `${n.getFullYear()}/${String(n.getMonth()+1).padStart(2,'0')}/${String(n.getDate()).padStart(2,'0')} (${d[n.getDay()]}) ${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+}
+
+function displayScheduleUpdate(dateStr){
+  const el = document.getElementById('schedule-update');
+  if(!dateStr){ el.style.display='none'; return; }
+  el.textContent = '📅 スケジュール更新日：' + dateStr;
+  el.style.display = 'inline-block';
+}
+
+function saveScheduleUpdate(){
+  const dateStr = formatScheduleDate();
+  localStorage.setItem('sc3_schedule_update', dateStr);
+  displayScheduleUpdate(dateStr);
+  // GASにも保存（全PCで共有）
+  comments['__schedule_update__'] = dateStr;
+  LSW('sc3_comments', comments);
+  pushGasData('__schedule_update__');
+}
+
+function restoreScheduleUpdate(){
+  // GASから取得した値を優先、なければlocalStorage
+  const gasVal = comments['__schedule_update__'] || '';
+  const lsVal = localStorage.getItem('sc3_schedule_update') || '';
+  displayScheduleUpdate(gasVal || lsVal);
 }
 
 // ===== MODAL =====
@@ -1360,6 +1396,8 @@ function sortByDate(arr){ arr.sort((a,b)=>dateToNum(a.chakushu)-dateToNum(b.chak
 
 // ===== INIT =====
 (()=>{ const n=new Date(),d=['日','月','火','水','木','金','土']; document.getElementById('current-date').textContent=`${n.getFullYear()}/${String(n.getMonth()+1).padStart(2,'0')}/${String(n.getDate()).padStart(2,'0')} (${d[n.getDay()]})`; })();
+// スケジュール更新日をlocalStorageから即表示
+displayScheduleUpdate(localStorage.getItem('sc3_schedule_update')||'');
 // 起動時は閲覧モード
 document.body.classList.add('view-mode');
 
@@ -1383,6 +1421,7 @@ document.body.classList.add('view-mode');
     populateFilters();
   }
   if(projOk || metaOk){ renderTable(); }
+  restoreScheduleUpdate();
   hideLoading();
   showStatus('');
 })();
