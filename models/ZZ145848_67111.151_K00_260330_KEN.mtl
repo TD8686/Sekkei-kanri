@@ -1,0 +1,123 @@
+# ZW3D OBJ Exporter v2.1 - (c)2017 ZWCAD Software Co.
+# Created: 2026.03.30 20:09:21
+
+newmtl material_000
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 0.501961 0.25098 0.25098
+ Kd 0.501961 0.25098 0.25098
+ Ks 1 1 1
+
+newmtl material_001
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 0 0 1
+ Kd 0 0 1
+ Ks 1 1 1
+
+newmtl material_002
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 1 0.501961 0
+ Kd 1 0.501961 0
+ Ks 1 1 1
+
+newmtl material_003
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 1 1 0
+ Kd 1 1 0
+ Ks 1 1 1
+
+newmtl material_004
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 1 0.501961 0.501961
+ Kd 1 0.501961 0.501961
+ Ks 1 1 1
+
+newmtl material_005
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 0 1 0
+ Kd 0 1 0
+ Ks 1 1 1
+
+newmtl material_006
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 0.2 0.2 0.4
+ Kd 0.2 0.2 0.4
+ Ks 1 1 1
+
+newmtl material_007
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 1 1 1
+ Kd 1 1 1
+ Ks 1 1 1
+
+newmtl material_008
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 0.501961 0 1
+ Kd 0.501961 0 1
+ Ks 1 1 1
+
+newmtl material_009
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 0.823529 0.823529 1
+ Kd 0.823529 0.823529 1
+ Ks 1 1 1
+
+newmtl material_010
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 0 1 1
+ Kd 0 1 1
+ Ks 1 1 1
+
+newmtl material_011
+ Ns 500
+ d 1
+ Tr 0
+ Tf 1 1 1
+ illum 2
+ Ka 1 0 1
+ Kd 1 0 1
+ Ks 1 1 1
+
