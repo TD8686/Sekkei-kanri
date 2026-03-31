@@ -83,8 +83,7 @@ td{padding:4px 6px;vertical-align:middle}
 .comment-meta{font-size:8px;color:var(--muted);margin-top:0;font-family:'JetBrains Mono',monospace;line-height:1.2}
 .comment-ta{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:#3a2810;font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:3px 6px;resize:vertical;min-height:28px;height:28px;outline:none;line-height:1.4;transition:border-color .2s;box-sizing:border-box;}
 .comment-ta:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(74,127,212,.15)}
-.gaichuu-ta{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:'Noto Sans JP',sans-serif;font-size:11px;padding:5px 7px;resize:vertical;min-height:42px;outline:none;line-height:1.5;transition:border-color .2s;box-sizing:border-box;}
-.gaichuu-ta:focus{border-color:var(--accent2);box-shadow:0 0 0 2px rgba(42,157,143,.15)}
+.gaichuu-disp{font-size:11px;color:var(--text);line-height:1.5;padding:3px 5px;white-space:pre-wrap;word-break:break-all;}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(44,36,22,.5);z-index:200;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
 .modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:28px;width:90%;max-width:500px;box-shadow:0 8px 32px rgba(44,36,22,.2)}
@@ -143,8 +142,7 @@ td{padding:4px 6px;vertical-align:middle}
 }
 
 /* 閲覧モード時：textarea・selectを読み取り専用風に */
-body.view-mode .comment-ta,
-body.view-mode .gaichuu-ta{
+body.view-mode .comment-ta{
   pointer-events:auto;
   background:transparent;
   border-color:transparent;
@@ -313,7 +311,7 @@ body.view-mode .url-3d-input{
   <th class="col-progress">進捗</th>
   <th class="col-comment">⑨コメント</th>
   <th class="col-hikitori">⑩引取/立会/発送</th>
-  <th class="col-gaichuu">⑪外注予定&amp;決定 <span style="font-size:9px;color:var(--accent2)">🔒</span></th>
+  <th class="col-gaichuu">⑪外注予定&amp;決定</th>
   <th class="col-eigyo">⑫営業担当</th>
   <th class="col-sekkei">⑬設計担当</th>
   <th style="min-width:90px">3Dモデル</th>
@@ -334,7 +332,7 @@ body.view-mode .url-3d-input{
   <th class="col-progress">進捗</th>
   <th class="col-comment">⑨コメント</th>
   <th class="col-hikitori">⑩引取/立会/発送</th>
-  <th class="col-gaichuu">⑪外注予定&amp;決定 <span style="font-size:9px;color:var(--accent2)">🔒</span></th>
+  <th class="col-gaichuu">⑪外注予定&amp;決定</th>
   <th class="col-eigyo">⑫営業担当</th>
   <th class="col-sekkei">⑬設計担当</th>
   <th style="min-width:90px">3Dモデル</th>
@@ -350,7 +348,7 @@ body.view-mode .url-3d-input{
     Excelからエクスポートした全データCSVを選択してください。<br>
     <strong>Shift-JIS（CP932）・UTF-8どちらのCSVにも対応しています。</strong><br>
     カンマを含む部品名・引取情報も正確に処理します。<br>
-    コメント・外注予定&amp;決定・進捗マークは保持されます。<br>
+    コメント・進捗マークは保持されます。外注予定&amp;決定はCSVから更新されます。<br>
     <strong>更新後のデータはブラウザに自動保存され、次回開いても最新状態が維持されます。</strong>
   </p>
   <label class="file-label" for="csv-file">📁 CSVファイルを選択</label>
@@ -437,8 +435,12 @@ async function fetchGasData(){
   Object.entries(json).forEach(([id, d])=>{
     const cta=document.getElementById(`cta-${id}`);
     if(cta && d.comment!==undefined) cta.value=d.comment;
-    const gta=document.getElementById(`gta-${id}`);
-    if(gta && d.gaichuu!==undefined) gta.value=d.gaichuu;
+    // 外注欄の表示を更新
+    if(d.gaichuu!==undefined){
+      gaichuu[id]=d.gaichuu;
+      const gcTd=document.getElementById(`gc-${id}`);
+      if(gcTd){ const div=gcTd.querySelector('.gaichuu-disp'); if(div) div.textContent=d.gaichuu; }
+    }
     if(d.progress!==undefined){
       progmarks[id]=d.progress;
       const sel=document.getElementById(`prog-${id}`);
@@ -724,10 +726,7 @@ function renderTable(){
       </td>
       <td class="col-hikitori">${p.hikitori||'—'}</td>
       <td class="col-gaichuu" id="gc-${p.id}">
-        <textarea class="gaichuu-ta" id="gta-${p.id}"
-          onchange="saveGaichuu('${p.id}')"
-          onblur="saveGaichuu('${p.id}')">${gai}</textarea>
-        ${gd?`<div class="comment-meta">更新:${gd} 🔒</div>`:''}
+        <div class="gaichuu-disp">${gai||''}</div>
       </td>
       <td class="col-eigyo">${p.eigyo||'—'}</td>
       <td class="col-sekkei">${p.sekkei||'—'}</td>
@@ -1040,20 +1039,6 @@ function saveComment(id){
   updateCounts(); showToast('コメントを保存しました');
 }
 
-// ===== GAICHUU =====
-function saveGaichuu(id){
-  if(!isEditMode) return;  // 閲覧モード時は保存しない
-  const el=document.getElementById(`gta-${id}`); if(!el) return;
-  const val=el.value.trim();
-  gaichuu[id]=val; const now=new Date();
-  gaichuuDates[id]=`${now.getMonth()+1}/${now.getDate()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-  LSW('sc3_gaichuu',gaichuu); LSW('sc3_gdates',gaichuuDates);
-  pushGasData(id);
-  const gta=document.getElementById(`gta-${id}`);
-  if(gta){ let m=gta.nextElementSibling; if(!m||!m.classList.contains('comment-meta')){ m=document.createElement('div'); m.className='comment-meta'; gta.parentNode.insertBefore(m,gta.nextSibling); } m.innerHTML=`更新:${gaichuuDates[id]} 🔒`; }
-  showToast('外注予定&決定を保存しました');
-}
-
 // ===== CP932デコーダ (Shift-JIS/CP932をブラウザで確実に読む) =====
 // ArrayBufferをCP932文字列に変換
 function decodeCP932(buffer){
@@ -1098,7 +1083,7 @@ const COL_MAP = {
   '設計担当者':'sekkei', '品種名':'hinshuu', '製造区分扱い名':'kubun',
   '納期':'nouki', 'P/J No.':'pjno', '部品名称':'buhinmei',
   '引取/立会/発送':'hikitori', '営業担当者':'eigyo',
-  '制作内容':'_j', '出図完了日':'_c'
+  '制作内容':'_j', '出図完了日':'_c', '外注予定&決定':'gaichuuCsv'
 };
 
 let pendingCSV=null;
@@ -1153,13 +1138,14 @@ function previewCSV(input){
           eigyo:    get(r,'eigyo'),
           sekkei:   get(r,'sekkei'),
           seisaku:  j,
+          gaichuuCsv: get(r,'gaichuuCsv'),
         });
       }
       // 出図予定日の昇順ソート（数値比較で確実に並べる）
       sortByDate(parsed);
       pendingCSV=parsed;
       prev.className='modal-preview ok';
-      prev.textContent=`✓ ${parsed.length} 件を検出｜コメント・外注・進捗は保持されます`;
+      prev.textContent=`✓ ${parsed.length} 件を検出｜コメント・進捗は保持、外注はCSVから更新されます`;
       applyBtn.disabled=false;
     }catch(err){
       prev.className='modal-preview err';
@@ -1171,7 +1157,15 @@ function previewCSV(input){
 }
 function applyCSV(){
   if(!pendingCSV) return;
-  PROJ_DATA=sortByDate(pendingCSV); pendingCSV=null;
+  PROJ_DATA=sortByDate(pendingCSV);
+  // CSVの外注予定&決定をgaichuuに反映
+  PROJ_DATA.forEach(p => {
+    if(p.gaichuuCsv !== undefined){
+      gaichuu[p.id] = p.gaichuuCsv;
+    }
+  });
+  LSW('sc3_gaichuu', gaichuu);
+  pendingCSV=null;
   const modalEl = document.getElementById('modal-csv');
   if(modalEl) modalEl.classList.remove('open');
   const fi = document.getElementById('csv-file');
@@ -1191,6 +1185,10 @@ function applyCSV(){
     } else {
       showToast(`⚠ GAS保存に失敗しました。localStorageには保存済みです`);
     }
+    // CSVの外注データをGASに送信
+    for(const p of PROJ_DATA){
+      if(p.gaichuuCsv) await pushGasData(p.id);
+    }
     // スケジュール更新日を保存・表示
     saveScheduleUpdate();
     // 不要3Dファイルのチェック
@@ -1199,32 +1197,6 @@ function applyCSV(){
       setTimeout(()=> showUnused3dFiles(unused), 500);
     }
   }, 50);
-}
-
-// ===== GAICHUU CSV =====
-let pendingGaichuu=null;
-function previewGaichuu(input){
-  const file=input.files[0]; if(!file) return;
-  const prev=document.getElementById('gaichuu-preview');
-  const reader=new FileReader();
-  reader.onload=e=>{
-    const text=decodeCP932(e.target.result);
-    const rows=parseCSV(text);
-    pendingGaichuu={};
-    rows.forEach(r=>{ if(r.length>=2&&r[0].trim()){ pendingGaichuu[r[0].trim()]=r.slice(1).join(',').trim(); }});
-    const cnt=Object.keys(pendingGaichuu).length;
-    prev.className='modal-preview '+(cnt?'ok':'err');
-    prev.textContent=cnt?`✓ ${cnt} 件の外注情報を検出`:'⚠ データが見つかりません';
-  };
-  reader.readAsArrayBuffer(file);
-}
-function applyGaichuu(){
-  if(!pendingGaichuu) return;
-  const now=new Date(),ts=`${now.getMonth()+1}/${now.getDate()} [CSV]`;
-  Object.entries(pendingGaichuu).forEach(([id,val])=>{ gaichuu[id]=val; gaichuuDates[id]=ts; });
-  LSW('sc3_gaichuu',gaichuu); LSW('sc3_gdates',gaichuuDates);
-  pendingGaichuu=null; closeModal('gaichuu'); renderTable();
-  showToast(`外注予定&決定を ${Object.keys(gaichuu).length} 件更新しました`);
 }
 
 // ===== スケジュール更新日 =====
