@@ -388,6 +388,19 @@ const LSW = (k,v) => localStorage.setItem(k, JSON.stringify(v));
 // 工事データをlocalStorageに保存・復元
 const STORAGE_KEY_DATA = 'sc3_proj_data';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbwM8W2oPhRCtF_m07gb0Mw2CzQIORKtFxWl6wm2V4H8MVwumc8NBeeVvxkFtpZhkY7o/exec';
+const NETLIFY_BASE = 'https://steady-biscuit-7912c3.netlify.app/';
+
+// URL自動変換：ファイル名だけ入力された場合はNetlify URLに変換
+function resolveUrl3d(input){
+  if(!input) return '';
+  input = input.trim();
+  // 既にフルURLの場合はそのまま
+  if(input.startsWith('http://') || input.startsWith('https://')) return input;
+  // models/で始まる場合はGitHub（相対パス）
+  if(input.startsWith('models/')) return input;
+  // それ以外（ファイル名のみ）はNetlify URLに変換
+  return NETLIFY_BASE + input;
+}
 
 // ===== GAS通信 =====
 let gasData = {};
@@ -787,6 +800,7 @@ function saveUrl3d(id, url){
 function openViewer(id){
   let url = urls3d[id] || '';
   if(!url){ alert('3DファイルのパスがURL欄に未登録です。\n編集モードでパスを入力してください。'); return; }
+  url = resolveUrl3d(url);
   const title = PROJ_DATA.find(p=>p.id===id)?.buhinmei || id;
   document.getElementById('viewer-title').textContent = title;
 
@@ -1241,12 +1255,13 @@ function checkUnused3dFiles(){
   const unused = [];
   Object.entries(urls3d).forEach(([id, url])=>{
     if(url && !currentIds.has(id)){
-      // URLからファイル名を抽出
-      const fileName = url.substring(url.lastIndexOf('/')+1);
+      const resolved = resolveUrl3d(url);
+      // resolvedからファイル名を抽出
+      const fileName = resolved.substring(resolved.lastIndexOf('/')+1);
       const mtlName = fileName.replace(/\.obj$/i, '.mtl');
       // 保存先を判定
       let storage = 'GitHub（100MB未満フォルダ）';
-      if(url.includes('netlify.app')){
+      if(resolved.includes('netlify.app') || (!url.startsWith('models/') && !url.startsWith('http'))){
         storage = 'Netlify（100MB以上フォルダ）';
       }
       unused.push({id, url, fileName, mtlName, storage});
