@@ -775,10 +775,15 @@ function toggleSeisaku(){
   renderTable();
 }
 // ===== 3D URL =====
-function saveUrl3d(id, url){
-  url = url.trim();
+function saveUrl3d(id, rawInput){
+  rawInput = rawInput.trim();
+  // ファイル名だけの場合はフルURLに変換
+  const url = resolveUrl3d(rawInput);
   urls3d[id] = url;
   LSW('sc3_urls3d', urls3d);
+  // 入力欄をフルURLに更新
+  const input = document.getElementById(`url3d-${id}`);
+  if(input && input.value !== url) input.value = url;
   // GASにも保存（metaデータとして）
   pushGasData(id);
   // 3Dボタンを動的に追加/削除
